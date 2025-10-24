@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Copy-Paste Extension Popup</title>
+  <style>
+    body { font-family: Arial, sans-serif; min-width: 320px; }
+    #preset-list { max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
+    .preset-item { padding: 5px; border-bottom: 1px solid #eee; cursor: pointer; }
+    .preset-item:hover { background-color: #f0f0f0; }
+    #edit-section { margin-top: 15px; }
+    label { display: block; margin-top: 10px; }
+    input[type=text] { width: 100%; padding: 5px; }
+    button { margin-top: 10px; padding: 6px 12px; }
+    #log { color: gray; font-size: 0.9em; }
+  </style>
+</head>
+<body>
+  <h3>Copy-Paste Presets</h3>
+  <div id="preset-list"></div>
+  <button id="add-new-btn">Add New Paste Target</button>
+  <div id="edit-section" style="display:none;">
+    <label for="preset-name">Preset Name</label>
+    <input type="text" id="preset-name" />
+    <label for="preset-url">Preset URL</label>
+    <input type="text" id="preset-url" disabled />
+    <label for="preset-selector">Element Selector</label>
+    <input type="text" id="preset-selector" disabled />
+    <label><input type="checkbox" id="auto-submit" /> Auto-submit after paste</label>
+    <label><input type="checkbox" id="reuse-tab" /> Reuse existing tab for this domain</label>
+    <button id="save-preset">Save</button>
+    <button id="cancel-edit">Cancel</button>
+    <div id="log"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
+
+
+
