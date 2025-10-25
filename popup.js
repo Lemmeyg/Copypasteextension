@@ -4,7 +4,7 @@ const inExtensionTab = window.location.protocol === "chrome-extension:";
 console.log("[Popup] Running in", inExtensionTab ? "extension tab mode" : "popup mode");
 
 const presetsList = document.getElementById('preset-list');
-const addNewBtn = document.getElementById('add-new-btn');
+//const addNewBtn = document.getElementById('add-new-btn');
 const editSection = document.getElementById('edit-section');
 const presetNameInput = document.getElementById('preset-name');
 const presetUrlInput = document.getElementById('preset-url');
@@ -70,15 +70,15 @@ function clearEdit() {
   autoSubmitInput.checked = false;
   reuseTabInput.checked = false;
   editSection.style.display = "none";
-  addNewBtn.disabled = false;
+  //addNewBtn.disabled = false;
   log("Edit cancelled");
 }
 
-addNewBtn.onclick = async () => {
-  if (inExtensionTab) {
-    log("Cannot create new paste preset from this page. Please right-click a field on any website and choose 'Add as Paste Target' from the context menu.");
-    return;
-  }
+//addNewBtn.onclick = async () => {
+ // if (inExtensionTab) {
+//    log("Cannot create new paste preset from this page. Please right-click a field on any website and choose 'Add as Paste Target' from the context menu.");
+ //   return;
+//  }
   // Only works when the popup is opened on a webpage, not as a chrome-extension:// tab
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     const activeTab = tabs[0];
@@ -94,11 +94,11 @@ addNewBtn.onclick = async () => {
       autoSubmitInput.checked = true;
       reuseTabInput.checked = false;
       editSection.style.display = "block";
-      addNewBtn.disabled = true;
+      //addNewBtn.disabled = true;
       log("Adding new preset from content script");
     });
   });
-};
+
 
 saveBtn.onclick = async () => {
   const name = presetNameInput.value.trim();

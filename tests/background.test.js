@@ -1,5 +1,6 @@
 // tests/background.test.js
-const { createContextMenuData } = require('../background'); // Exported helper to generate menu data
+
+const { createContextMenuData, savePresets, loadPresets } = require('../background.js');
 
 describe('Context menu creation logic', () => {
   it('creates menu data for each preset', () => {

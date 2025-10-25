@@ -29,18 +29,32 @@ async function savePresets() {
 
 function updateContextMenu() {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: ADD_TARGET_ID,
-      title: "Add as Paste Target",
-      contexts: ["editable"]
-    });
-
+    // Create the parent menu "Copy-Paste Workflow"
     chrome.contextMenus.create({
       id: PARENT_ID,
       title: "Copy-Paste Workflow",
       contexts: ["editable", "selection"]
     });
 
+    // Add "Add as Paste Target" under parent menu
+    chrome.contextMenus.create({
+      id: ADD_TARGET_ID,
+      parentId: PARENT_ID,
+      title: "Add as Paste Target",
+      contexts: ["editable"]
+    });
+
+    // Add presets under the same parent menu, flat structure
+    presets.forEach(preset => {
+      chrome.contextMenus.create({
+        id: preset.id.toString(), // ensure string ID for consistency
+        parentId: PARENT_ID,
+        title: preset.name,
+        contexts: ["selection"]
+      });
+    });
+
+    // Add "Configure" as last option under parent menu
     chrome.contextMenus.create({
       id: CONFIGURE_ID,
       parentId: PARENT_ID,
@@ -48,18 +62,18 @@ function updateContextMenu() {
       contexts: ["editable", "selection"]
     });
 
-    presets.forEach(preset => {
-      chrome.contextMenus.create({
-        id: preset.id,
-        parentId: PARENT_ID,
-        title: preset.name,
-        contexts: ["selection"]
-      });
-    });
-
     console.log("[Background] Context menus updated");
   });
 }
+
+chrome.runtime.onMessage.addListener((message, sender) => {
+  if (message.type === "contextStatus") {
+    chrome.contextMenus.update(ADD_TARGET_ID, { enabled: message.isEditable });
+    presets.forEach(preset => {
+      chrome.contextMenus.update(preset.id.toString(), { enabled: message.hasSelection });
+    });
+  }
+});
 
 async function findReusableTab(urlOrigin, selector) {
   const tabs = await chrome.tabs.query({});
@@ -91,14 +105,35 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.log("[Background] Context menu clicked:", info.menuItemId);
+  console.log("[Background] Clicked menuItemId:", info.menuItemId);
+  console.log("[Background] Presets IDs:", presets.map(p => p.id.toString()));
+
+  if (info.menuItemId === CONFIGURE_ID) {
+    try {
+      await chrome.action.openPopup();
+    } catch (err) {
+      console.warn("[Background] Failed to open popup:", err);
+    }
+    return;
+  }
 
   if (info.menuItemId === ADD_TARGET_ID) {
-    chrome.tabs.sendMessage(tab.id, { type: "get_element_info" }, async (response) => {
-      if (!response || !response.success) {
-        console.warn("[Background] Could not capture element selector from content script.");
-        return;
-      }
+  try {
+    // Inject the content script before sending message
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ['contentScript.js']
+    });
+  } catch (err) {
+    console.warn("[Background] Content script injection failed:", err);
+    return;
+  }
+
+  chrome.tabs.sendMessage(tab.id, { type: "get_element_info" }, async (response) => {
+    if (!response || !response.success) {
+      console.warn("[Background] Could not capture element selector from content script.");
+      return;
+    }
 
       const defaultName = `Paste to ${new URL(response.url).hostname}`;
       chrome.scripting.executeScript({
@@ -127,14 +162,8 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  if (info.menuItemId === CONFIGURE_ID) {
-    chrome.tabs.create({
-      url: chrome.runtime.getURL("popup.html")
-    });
-    return;
-  }
-
-  const preset = presets.find(p => p.id === info.menuItemId);
+  // Find preset by string ID
+  const preset = presets.find(p => p.id.toString() === info.menuItemId);
   if (!preset) {
     console.warn("[Background] No matching preset for menuId:", info.menuItemId);
     return;
@@ -152,26 +181,36 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       target: { tabId, allFrames: true },
       func: (selector, text, autoSubmit, attempt) => {
         console.log(`[Injected] Attempt ${attempt} in frame ${window.location.href}`);
-
         const el = document.querySelector(selector);
+
         if (!el) {
           console.warn(`[Injected] Element not found for selector: ${selector}`);
           return;
         }
 
+        el.focus();
         el.value = text;
         el.setAttribute("value", text);
+
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
-        el.focus();
 
-        // Delay log
+        ['keydown', 'keyup'].forEach(evtName => {
+          el.dispatchEvent(new KeyboardEvent(evtName, {
+            key: 'Enter',
+            code: 'Enter',
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true,
+          }));
+        });
+
         setTimeout(() => {
           console.log(`[Injected] After 1s, value is: '${el.value}'`);
         }, 1000);
 
         if (autoSubmit && attempt > 1) {
-          // Attempt form submit if available
           if (el.form) {
             try {
               el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit();
@@ -182,14 +221,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
             }
           }
 
-          // Try clicking a nearby submit button (tailored to Yahoo example)
           const buttonSelectorCandidates = [
             'button[type="submit"]',
             'button[aria-label*="search"]',
-            'button[data-test-id="search-button"]',
-            'input[type="submit"]',
+            'button[data-test-id*="search"]',
+            'input[type="submit"]'
           ];
-
           let clicked = false;
           for (const sel of buttonSelectorCandidates) {
             const btn = document.querySelector(sel);
@@ -203,21 +240,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
                 console.warn(`[Injected] Failed to click button: ${sel}`, err);
               }
             }
-          }
-
-          // If no button clicked, fallback to dispatch Enter key events
-          if (!clicked) {
-            ['keydown', 'keypress', 'keyup'].forEach(evtName => {
-              el.dispatchEvent(new KeyboardEvent(evtName, {
-                key: 'Enter',
-                code: 'Enter',
-                keyCode: 13,
-                which: 13,
-                bubbles: true,
-                cancelable: true,
-              }));
-            });
-            console.log("[Injected] Dispatched Enter key events fallback");
           }
         }
       },

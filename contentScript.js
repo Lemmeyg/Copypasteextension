@@ -9,13 +9,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
-    // Prefer id, then name, fallback CSS path by tag name (simple)
     let selector = "";
     if (el.id) selector = `#${el.id}`;
-    else if (el.name) selector = `${el.tagName.toLowerCase()}[name="${el.name}"]`;
+    else if (el.name) selector = `${el.tagName.toLowerCase()}[name='${el.name}']`;
     else selector = el.tagName.toLowerCase();
 
     console.log("[ContentScript] Element selector:", selector);
+
     sendResponse({
       success: true,
       selector,
@@ -24,19 +24,42 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
 
-  if (message.type === 'SET_INPUT_VALUE') {
+  if (message.type === "SET_INPUT_VALUE") {
     const input = document.querySelector(message.selector);
     if (input) {
       input.value = message.value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+
       if (message.autoSubmit) {
         const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
         input.dispatchEvent(event);
       }
+
       sendResponse({ success: true });
     } else {
-      sendResponse({ success: false, error: 'Input not found' });
+      sendResponse({ success: false, error: "Input not found" });
     }
   }
 
-  return true; // Keep message channel open for async sendResponse
+  return true;
 });
+
+// contentScript.js
+function updateContextStatus() {
+  const isEditable = document.activeElement && 
+                     (document.activeElement.isContentEditable || 
+                      document.activeElement.tagName === "TEXTAREA" || 
+                      (document.activeElement.tagName === "INPUT" && document.activeElement.type === "text"));
+  const hasSelection = window.getSelection().toString().length > 0;
+  chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
+}
+
+document.addEventListener('selectionchange', updateContextStatus);
+document.addEventListener('focusin', updateContextStatus);
+document.addEventListener('focusout', updateContextStatus);
+
+// Initialize once immediately
+updateContextStatus();
+
+
