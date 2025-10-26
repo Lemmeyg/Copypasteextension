@@ -68,12 +68,16 @@ function updateContextMenu() {
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message.type === "contextStatus") {
+    // Enable Add as Paste Target only if right-click is on an editable input
     chrome.contextMenus.update(ADD_TARGET_ID, { enabled: message.isEditable });
+
+    // Enable presets only if there is a selection anywhere on the page
     presets.forEach(preset => {
       chrome.contextMenus.update(preset.id.toString(), { enabled: message.hasSelection });
     });
   }
 });
+
 
 async function findReusableTab(urlOrigin, selector) {
   const tabs = await chrome.tabs.query({});

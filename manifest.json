@@ -20,19 +20,22 @@
   "action": {
     "default_popup": "popup.html"
   },
- "content_scripts": [
-  {
-    "matches": ["<all_urls>"],
-    "js": ["contentScript.js"],
-    "run_at": "document_idle",
-    "all_frames": true
-  }
-]
-,
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
   "options_ui": {
     "page": "popup.html",
     "open_in_tab": true
-  }
-  
-  
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["README.md"],
+      "matches": ["<all_urls>"]
+    }
+  ]
 }

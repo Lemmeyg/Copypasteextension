@@ -3,21 +3,376 @@
 <head>
   <title>Copy-Paste Extension Popup</title>
   <style>
-    body { font-family: Arial, sans-serif; min-width: 320px; }
-    #preset-list { max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; }
-    .preset-item { padding: 5px; border-bottom: 1px solid #eee; cursor: pointer; }
-    .preset-item:hover { background-color: #f0f0f0; }
-    #edit-section { margin-top: 15px; }
-    label { display: block; margin-top: 10px; }
-    input[type=text] { width: 100%; padding: 5px; }
-    button { margin-top: 10px; padding: 6px 12px; }
-    #log { color: gray; font-size: 0.9em; }
+    /* Modern design system with theme support */
+    :root {
+      /* Light theme */
+      --background: 0 0% 100%;
+      --foreground: 240 10% 3.9%;
+      --card: 0 0% 100%;
+      --card-foreground: 240 10% 3.9%;
+      --muted: 240 4.8% 95.9%;
+      --muted-foreground: 240 3.8% 46.1%;
+      --border: 240 5.9% 90%;
+      --input: 240 5.9% 90%;
+      --ring: 240 5% 64.9%;
+      --accent: 24 70% 50%;
+      --accent-foreground: 0 0% 100%;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: 240 10% 3.9%;
+        --foreground: 0 0% 98%;
+        --card: 240 10% 3.9%;
+        --card-foreground: 0 0% 98%;
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 64.9%;
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 240 4.9% 83.9%;
+        --accent: 24 70% 50%;
+        --accent-foreground: 0 0% 100%;
+      }
+      
+      body {
+        background: linear-gradient(135deg, hsl(220, 20%, 15%) 0%, hsl(220, 25%, 18%) 100%);
+      }
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      min-width: 360px;
+      max-width: 400px;
+      margin: 0;
+      padding: 16px;
+      background: linear-gradient(135deg, hsl(210, 100%, 97%) 0%, hsl(200, 100%, 95%) 100%);
+      color: hsl(var(--foreground));
+      line-height: 1.5;
+      /* Add flex layout for fixed footer */
+      display: flex;
+      flex-direction: column;
+      height: 500px;
+    }
+
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 18px;
+      font-weight: 600;
+      color: hsl(var(--foreground));
+      letter-spacing: -0.01em;
+      /* Prevent shrinking */
+      flex-shrink: 0;
+    }
+
+    #preset-list {
+      /* Use flex-grow to fill available space */
+      flex: 1;
+      overflow-y: auto;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      padding: 4px;
+      background-color: hsl(var(--card));
+      margin-bottom: 16px;
+    }
+
+    /* Custom scrollbar */
+    #preset-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    #preset-list::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    #preset-list::-webkit-scrollbar-thumb {
+      background: hsl(var(--muted));
+      border-radius: 4px;
+    }
+
+    #preset-list::-webkit-scrollbar-thumb:hover {
+      background: hsl(var(--muted-foreground));
+    }
+
+    .preset-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-size: 14px;
+      color: hsl(var(--foreground));
+      margin-bottom: 2px;
+      background-color: hsl(var(--card));
+      border: 1px solid hsl(var(--border));
+    }
+
+    .preset-item:hover {
+      background-color: hsl(var(--muted));
+    }
+
+    .preset-item:active {
+      transform: scale(0.98);
+    }
+
+    /* Add accordion expanded state */
+    .preset-item.expanded {
+      background-color: hsl(var(--muted));
+    }
+
+    /* Add edit options container that slides down */
+    .preset-edit-options {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+      padding: 0 12px;
+    }
+
+    .preset-edit-options.open {
+      max-height: 300px;
+      padding: 8px 12px 12px 12px;
+    }
+
+    .preset-edit-options label {
+      display: block;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      color: hsl(var(--foreground));
+      margin-bottom: 4px;
+    }
+
+    .preset-edit-options input[type=text] {
+      width: 100%;
+      padding: 6px 10px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      font-size: 13px;
+      background-color: hsl(var(--input));
+      color: hsl(var(--foreground));
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .preset-edit-options input[type=text]:focus {
+      outline: none;
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 3px hsla(var(--ring) / 0.1);
+    }
+
+    .preset-edit-options input[type=text]:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background-color: hsl(var(--muted));
+    }
+
+    .preset-edit-options input[type=checkbox] {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      cursor: pointer;
+      accent-color: hsl(var(--accent));
+    }
+
+    .preset-edit-options label:has(input[type=checkbox]) {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 400;
+      margin-top: 8px;
+    }
+
+    .preset-edit-options .button-container {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .preset-edit-options button {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .preset-edit-options .save-btn {
+      background-color: hsl(var(--accent));
+      color: hsl(var(--accent-foreground));
+    }
+
+    .preset-edit-options .save-btn:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .preset-edit-options .save-btn:active {
+      transform: translateY(0);
+    }
+
+    .preset-edit-options .cancel-btn {
+      background-color: hsl(var(--muted));
+      color: hsl(var(--foreground));
+    }
+
+    .preset-edit-options .cancel-btn:hover {
+      background-color: hsl(var(--muted-foreground) / 0.2);
+    }
+
+    /* Remove old edit section styles, keep for backward compatibility */
+    #edit-section {
+      margin-top: 16px;
+      padding: 16px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 8px;
+      background-color: hsl(var(--card));
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      color: hsl(var(--foreground));
+      margin-bottom: 6px;
+    }
+
+    input[type=text] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid hsl(var(--border));
+      border-radius: 6px;
+      font-size: 14px;
+      background-color: hsl(var(--input));
+      color: hsl(var(--foreground));
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    input[type=text]:focus {
+      outline: none;
+      border-color: hsl(var(--ring));
+      box-shadow: 0 0 0 3px hsla(var(--ring) / 0.1);
+    }
+
+    input[type=text]:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      background-color: hsl(var(--muted));
+    }
+
+    input[type=checkbox] {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      cursor: pointer;
+      accent-color: hsl(var(--accent));
+    }
+
+    label:has(input[type=checkbox]) {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      font-weight: 400;
+      margin-top: 10px;
+    }
+
+    button {
+      margin-top: 12px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    #save-preset {
+      background-color: hsl(var(--accent));
+      color: hsl(var(--accent-foreground));
+      margin-right: 8px;
+    }
+
+    #save-preset:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    #save-preset:active {
+      transform: translateY(0);
+    }
+
+    #cancel-edit {
+      background-color: hsl(var(--muted));
+      color: hsl(var(--foreground));
+    }
+
+    #cancel-edit:hover {
+      background-color: hsl(var(--muted-foreground) / 0.2);
+    }
+
+    #log {
+      color: hsl(var(--muted-foreground));
+      font-size: 12px;
+      margin-top: 12px;
+      padding: 8px;
+      border-radius: 4px;
+      background-color: hsl(var(--muted));
+      line-height: 1.4;
+    }
+
+    /* Empty state styling */
+    #preset-list:empty::before {
+      content: 'No presets yet';
+      display: block;
+      text-align: center;
+      padding: 32px 16px;
+      color: hsl(var(--muted-foreground));
+      font-size: 14px;
+    }
+
+    /* Add fixed footer styles */
+    #footer-buttons {
+      flex-shrink: 0;
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid hsl(var(--border));
+    }
+
+    #footer-buttons button {
+      flex: 1;
+      margin: 0;
+      padding: 10px 16px;
+      background-color: hsl(var(--card));
+      color: hsl(var(--foreground));
+      border: 1px solid hsl(var(--border));
+      font-weight: 500;
+    }
+
+    #footer-buttons button:hover {
+      background-color: hsl(var(--muted));
+      transform: translateY(-1px);
+    }
+
+    #footer-buttons button:active {
+      transform: translateY(0);
+    }
   </style>
 </head>
 <body>
   <h3>Copy-Paste Presets</h3>
   <div id="preset-list"></div>
-   <!-- <button id="add-new-btn">Add New Paste Target</button> -->
+  
+  <!-- Keep old edit section hidden for backward compatibility -->
   <div id="edit-section" style="display:none;">
     <label for="preset-name">Preset Name</label>
     <input type="text" id="preset-name" />
@@ -26,14 +381,19 @@
     <label for="preset-selector">Element Selector</label>
     <input type="text" id="preset-selector" disabled />
     <label><input type="checkbox" id="auto-submit" /> Auto-submit after paste</label>
-    <label><input type="checkbox" id="reuse-tab" /> Reuse existing tab for this domain</label>
+    <!--<label><input type="checkbox" id="reuse-tab" /> Reuse existing tab for this domain</label> -->
     <button id="save-preset">Save</button>
     <button id="cancel-edit">Cancel</button>
     <div id="log"></div>
   </div>
+
+  <!-- Add fixed footer buttons -->
+  <div id="footer-buttons">
+    <button id="readme-btn">Read.me</button>
+    <button id="feedback-btn">Feedback</button>
+  </div>
+
   <script src="popup.js"></script>
+  
 </body>
 </html>
-
-
-
