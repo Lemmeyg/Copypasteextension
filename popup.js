@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const readmeBtn = document.getElementById('readme-btn');
   if (readmeBtn) {
     readmeBtn.addEventListener('click', function() {
-      chrome.tabs.create({ url: chrome.runtime.getURL('README.md') });
+      chrome.tabs.create({ url: chrome.runtime.getURL('README.HTML') });
     });
   }
 

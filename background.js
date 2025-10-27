@@ -1,16 +1,15 @@
 console.log("[Background] Initializing extension");
 
 let presets = [];
-let rebuildingMenu = false; // Prevent race conditions during menu rebuild
+let isRebuildingMenus = false;
+let currentActiveTab = null;
 
 const MAX_PRESETS = 10;
+
 const PARENT_ID = "copyPasteRoot";
 const CONFIGURE_ID = "configure";
 const ADD_TARGET_ID = "add_paste_target";
 
-// -----------------------------
-// Storage helpers
-// -----------------------------
 async function loadPresets() {
   const store = await chrome.storage.sync.get("presets");
   presets = store.presets || [];
@@ -23,228 +22,142 @@ async function savePresets() {
   await updateContextMenu();
 }
 
-// -----------------------------
-// Helper: get active tab id
-// -----------------------------
-function getActiveTabId() {
-  return new Promise((resolve) => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (chrome.runtime.lastError) {
-        resolve(null);
-      } else {
-        resolve((tabs && tabs[0] && tabs[0].id) || null);
-      }
-    });
-  });
-}
-
-// Fallback: if no active tab or no content script responded,
-// find the first normal web page tab and request status from there
-chrome.tabs.query({ url: ["http://*/*", "https://*/*"] }, (tabs) => {
-  if (tabs && tabs.length > 0) {
-    const candidate = tabs[0];
-    chrome.tabs.sendMessage(candidate.id, { type: "refresh_context_status" }, (resp) => {
-      if (chrome.runtime.lastError) {
-        console.log("[Background] No content script in fallback tab (ignored)");
-      } else if (resp) {
-        console.log("[Background] Received fallback status from tab:", candidate.id);
-      }
-    });
-  }
-});
-
-// -----------------------------
-// Context menu builder + refresh (robust, waits for refresh response)
-// -----------------------------
 function updateContextMenu() {
   console.log("[Background] Updating context menu with", presets.length, "presets");
-  rebuildingMenu = true;
-
+  isRebuildingMenus = true;
+  
   return new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
-      // Root menu
       chrome.contextMenus.create({
         id: PARENT_ID,
         title: "Copy-Paste Workflow",
         contexts: ["editable", "selection"]
       });
 
-      // Add as paste target (start enabled, will be adjusted if active tab replies)
       chrome.contextMenus.create({
         id: ADD_TARGET_ID,
         parentId: PARENT_ID,
-        title: "Add a Preset Search",
+        title: "Add as Paste Target",
         contexts: ["editable"],
-        enabled: true
+        enabled: true // Always start enabled
       });
 
-      // Preset items (start enabled)
       presets.forEach(preset => {
         chrome.contextMenus.create({
           id: preset.id.toString(),
           parentId: PARENT_ID,
           title: preset.name,
           contexts: ["selection"],
-          enabled: true
+          enabled: true // Always start enabled
         });
       });
 
-      // Configure option
       chrome.contextMenus.create({
         id: CONFIGURE_ID,
         parentId: PARENT_ID,
         title: "Configure",
-        contexts: ["editable", "selection"],
-        enabled: true
+        contexts: ["editable", "selection"]
       });
 
-      console.log("[Background] Context menus created; requesting active-tab status (if content script exists)");
-
-      // Ask the active tab (if available) to refresh status.
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs && tabs[0];
-        if (!activeTab || !activeTab.id) {
-          // No active tab or can't talk to it — finish rebuild and leave menus enabled.
-          rebuildingMenu = false;
-          console.log("[Background] No active tab found, leaving menus enabled");
-          resolve();
-          return;
-        }
-
-        // Ask the content script to send a fresh status response.
-        chrome.tabs.sendMessage(activeTab.id, { type: "refresh_context_status" }, (response) => {
-          if (chrome.runtime.lastError) {
-            // No content script in the active tab — leave menus enabled.
-            rebuildingMenu = false;
-            console.log("[Background] No content script in active tab; menus left enabled (ignored).");
-            resolve();
-            return;
-          }
-
-          // Expected: content script may optionally send back a response object.
-          // We'll accept either a direct response or wait for the normal contextStatus message.
-          // If the response object contains isEditable/hasSelection, apply immediately; otherwise we'll wait for contextStatus messages.
-          if (response && typeof response.isEditable !== 'undefined') {
-            try {
-              chrome.contextMenus.update(ADD_TARGET_ID, { enabled: !!response.isEditable }, () => {
-                if (chrome.runtime.lastError) {
-                  console.warn("[Background] Could not update ADD_TARGET_ID:", chrome.runtime.lastError);
-                }
-              });
-
-              presets.forEach(preset => {
-                chrome.contextMenus.update(preset.id.toString(), { enabled: !!response.hasSelection }, () => {
-                  if (chrome.runtime.lastError) {
-                    // Harmless if it occurred due to timing.
-                    console.warn("[Background] Could not update preset menu item:", preset.id, chrome.runtime.lastError);
-                  }
-                });
-              });
-            } catch (err) {
-              console.warn("[Background] Error applying active-tab refresh response:", err);
-            }
-            rebuildingMenu = false;
-            resolve();
-          } else {
-            // If content script didn't return direct status in the callback, allow it to send a contextStatus message normally.
-            // We'll leave rebuildingMenu true for a short grace window (so any stray/stale messages are ignored),
-            // then clear it — this still ensures the next contextStatus that arrives will apply to the newly-built menus.
-            setTimeout(() => {
-              rebuildingMenu = false;
-              console.log("[Background] Completed menu rebuild (no immediate response from active tab).");
-              resolve();
-            }, 700); // brief grace period
-          }
-        });
-      });
+      console.log("[Background] Context menus created");
+      
+      // Small delay to let menus fully initialize
+      setTimeout(() => {
+        isRebuildingMenus = false;
+        // Request status update from current tab
+        requestContextStatusUpdate();
+        resolve();
+      }, 150);
     });
   });
 }
 
-// -----------------------------
-// Message listener
-// -----------------------------
+// Helper to request context status from active tab
+async function requestContextStatusUpdate() {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab) return;
+    
+    currentActiveTab = tab.id;
+    
+    // Try to send message to content script
+    chrome.tabs.sendMessage(tab.id, { type: "requestContextStatus" }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log("[Background] No content script in active tab; menus left enabled (default).");
+      }
+    });
+  } catch (err) {
+    console.warn("[Background] Error requesting context status:", err);
+  }
+}
+
+// Listen for messages from popup and content scripts
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Allow async responses
-  (async () => {
-    if (!message || !message.type) return;
-    console.log("[Background] Received message:", message.type);
-
-    // -------- contextStatus from contentScript --------
-    if (message.type === "contextStatus") {
-      // Ignore while rebuilding
-      if (rebuildingMenu) {
-        console.log("[Background] Ignoring contextStatus during menu rebuild");
-        return;
-      }
-
-      // Only accept status messages from the currently active tab
-      const activeTabId = await getActiveTabId();
-      const senderTabId = sender && sender.tab && sender.tab.id ? sender.tab.id : null;
-      if (!senderTabId) {
-        console.log("[Background] Ignoring contextStatus with no sender tab");
-        return;
-      }
-      if (senderTabId !== activeTabId) {
-        console.log(`[Background] Ignoring contextStatus from tab ${senderTabId} (active: ${activeTabId})`);
-        return;
-      }
-
-      // Apply updates
-      try {
-        chrome.contextMenus.update(ADD_TARGET_ID, { enabled: !!message.isEditable }, () => {
-          if (chrome.runtime.lastError) {
-            console.warn("[Background] Could not update ADD_TARGET_ID:", chrome.runtime.lastError);
-          }
-        });
-
-        presets.forEach(preset => {
-          chrome.contextMenus.update(preset.id.toString(), { enabled: !!message.hasSelection }, () => {
-            if (chrome.runtime.lastError) {
-              console.warn("[Background] Could not update preset menu item:", preset.id, chrome.runtime.lastError);
-            }
-          });
-        });
-      } catch (err) {
-        console.warn("[Background] Error updating menus from contextStatus:", err);
-      }
+  console.log("[Background] Received message:", message.type, "from tab:", sender.tab?.id);
+  
+  // Handle context status updates from content script
+  if (message.type === "contextStatus") {
+    // Ignore if we're currently rebuilding menus
+    if (isRebuildingMenus) {
+      console.log("[Background] Ignoring contextStatus during menu rebuild");
       return;
     }
-
-    // -------- updateContextMenu request (from popup) --------
-    if (message.type === "updateContextMenu") {
-      console.log("[Background] updateContextMenu requested; reloading presets and rebuilding menus");
-      await loadPresets();
+    
+    // Only process if from the current active tab
+    if (sender.tab?.id !== currentActiveTab) {
+      console.log("[Background] Ignoring contextStatus from inactive tab:", sender.tab?.id);
+      return;
+    }
+    
+    try {
+      chrome.contextMenus.update(ADD_TARGET_ID, { enabled: message.isEditable }).catch(err => {
+        console.warn("[Background] Could not update ADD_TARGET_ID:", err.message);
+      });
+      
+      presets.forEach(preset => {
+        chrome.contextMenus.update(preset.id.toString(), { enabled: message.hasSelection }).catch(err => {
+          console.warn("[Background] Could not update preset menu item:", preset.id);
+        });
+      });
+      
+      console.log("[Background] Context menu status updated - editable:", message.isEditable, "selection:", message.hasSelection);
+    } catch (err) {
+      console.warn("[Background] Error updating context menu status:", err);
+    }
+    return;
+  }
+  
+  // Handle context menu update request from popup
+  if (message.type === "updateContextMenu") {
+    console.log("[Background] updateContextMenu requested; reloading presets and rebuilding menus");
+    loadPresets().then(async () => {
       await updateContextMenu();
-      if (sendResponse) sendResponse({ success: true });
-      return;
+      sendResponse({ success: true });
+    });
+    return true; // Keep channel open for async response
+  }
+  
+  // Handle add preset request
+  if (message.type === "add_preset") {
+    if (presets.length >= MAX_PRESETS) {
+      sendResponse({ 
+        success: false, 
+        error: "You are on a plan that allows a maximum of 10 preset targets. Please delete one existing target before adding another." 
+      });
+      return true;
     }
-
-    // -------- add_preset (from popup) --------
-    if (message.type === "add_preset") {
-      // Allow multiple presets per URL — no duplicate check.
-      if (presets.length >= MAX_PRESETS) {
-        if (sendResponse) sendResponse({ success: false, error: "You can have a maximum of 10 preset targets. Please delete one before adding another." });
-        return;
-      }
-
-      // Accept the preset as provided (no duplicate prevention)
-      presets.push(message.data);
-      await savePresets();
-      if (sendResponse) sendResponse({ success: true });
-      return;
+    if (presets.some(p => p.selector === message.data.selector && p.url === message.data.url)) {
+      sendResponse({ success: false, error: "Duplicate preset" });
+      return true;
     }
-
-    // Other message types: ignore
-  })();
-
-  // Indicate we'll call sendResponse asynchronously when needed
-  return true;
+    presets.push(message.data);
+    savePresets().then(() => {
+      sendResponse({ success: true });
+    });
+    return true;
+  }
 });
 
-// -----------------------------
-// findReusableTab (unchanged)
-// -----------------------------
 async function findReusableTab(urlOrigin, selector) {
   const tabs = await chrome.tabs.query({});
   for (let tab of tabs) {
@@ -256,7 +169,7 @@ async function findReusableTab(urlOrigin, selector) {
           func: sel => !!document.querySelector(sel),
           args: [selector]
         });
-        if (result && result.result) {
+        if (result.result) {
           console.log("[Background] Found reusable tab:", tab.id);
           return tab.id;
         }
@@ -268,24 +181,40 @@ async function findReusableTab(urlOrigin, selector) {
   return null;
 }
 
-// -----------------------------
-// Lifecycle: onInstalled / onStartup
-// -----------------------------
 chrome.runtime.onInstalled.addListener(async () => {
   console.log("[Background] onInstalled event");
   await loadPresets();
-  await updateContextMenu();
+  updateContextMenu();
 });
 
+// Also load on startup
 chrome.runtime.onStartup.addListener(async () => {
   console.log("[Background] onStartup event");
   await loadPresets();
-  await updateContextMenu();
+  updateContextMenu();
 });
 
-// -----------------------------
-// Context menu click handler (mostly unchanged; removed duplicate-check behavior flag)
-// -----------------------------
+// Track active tab changes
+chrome.tabs.onActivated.addListener(async (activeInfo) => {
+  currentActiveTab = activeInfo.tabId;
+  console.log("[Background] Active tab changed to:", currentActiveTab);
+  
+  // Request context status from new active tab
+  setTimeout(() => {
+    requestContextStatusUpdate();
+  }, 100);
+});
+
+// Track when tabs are updated (page loads, etc.)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete' && tabId === currentActiveTab) {
+    console.log("[Background] Active tab finished loading");
+    setTimeout(() => {
+      requestContextStatusUpdate();
+    }, 100);
+  }
+});
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   console.log("[Background] Clicked menuItemId:", info.menuItemId);
   console.log("[Background] Current presets:", presets);
@@ -303,7 +232,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === ADD_TARGET_ID) {
     // Reload presets from storage first
     await loadPresets();
-
+    
     if (presets.length >= MAX_PRESETS) {
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -311,7 +240,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       });
       return;
     }
-
+    
     try {
       await chrome.scripting.executeScript({
         target: { tabId: tab.id },
@@ -330,13 +259,26 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       const defaultName = `Paste to ${new URL(response.url).hostname}`;
       chrome.scripting.executeScript({
         target: { tabId: tab.id },
-        func: suggestedName => prompt("Name for new Preset Search:", suggestedName) || suggestedName,
+        func: suggestedName => prompt("Name for new paste target:", suggestedName) || suggestedName,
         args: [defaultName]
       }, async (results) => {
         const name = results?.[0]?.result || defaultName;
 
-        // NOTE: duplicate-check removed — allow multiple presets per URL/selector as requested.
-
+        // Check for duplicates with current URL and selector combination
+        const isDuplicate = presets.some(p => 
+          p.selector === response.selector && 
+          new URL(p.url).hostname === new URL(response.url).hostname
+        );
+        
+        if (isDuplicate) {
+          console.warn("[Background] Duplicate preset detected for this selector on this domain");
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => alert('A preset for this element already exists on this domain.')
+          });
+          return;
+        }
+        
         const newPreset = {
           id: Date.now().toString(),
           name,
@@ -345,11 +287,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           autoSubmit: true,
           reuseTab: false
         };
-
+        
         presets.push(newPreset);
         await savePresets();
         console.log("[Background] New preset added:", newPreset);
-
+        
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
           func: (name) => alert(`Preset "${name}" added successfully!`),
@@ -360,7 +302,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
-  // Handle clicking a preset item
   const preset = presets.find(p => p.id.toString() === info.menuItemId);
   if (!preset) {
     console.warn("[Background] No matching preset for menuId:", info.menuItemId);
@@ -404,6 +345,10 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           }));
         });
 
+        setTimeout(() => {
+          console.log(`[Injected] After 1s, value is: '${el.value}'`);
+        }, 1000);
+
         if (autoSubmit && attempt > 1) {
           if (el.form) {
             try {
@@ -416,17 +361,19 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           }
 
           const buttonSelectorCandidates = [
-            'button[type=\"submit\"]',
-            'button[aria-label*=\"search\"]',
-            'button[data-test-id*=\"search\"]',
-            'input[type=\"submit\"]'
+            'button[type="submit"]',
+            'button[aria-label*="search"]',
+            'button[data-test-id*="search"]',
+            'input[type="submit"]'
           ];
+          let clicked = false;
           for (const sel of buttonSelectorCandidates) {
             const btn = document.querySelector(sel);
-            if (btn) {
+            if (btn && !clicked) {
               try {
                 btn.click();
                 console.log(`[Injected] Clicked submit button: ${sel}`);
+                clicked = true;
                 break;
               } catch (err) {
                 console.warn(`[Injected] Failed to click button: ${sel}`, err);
@@ -436,6 +383,12 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         }
       },
       args: [preset.selector, info.selectionText, preset.autoSubmit, attempt]
+    }, (results) => {
+      if (chrome.runtime.lastError) {
+        console.warn("[Background] Injection error:", chrome.runtime.lastError.message);
+      } else {
+        console.log("[Background] Injection result:", results);
+      }
     });
 
     if (attempt === 1) {
@@ -451,9 +404,9 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     injectPaste(reuseTabId, 1);
     chrome.tabs.update(reuseTabId, { active: true });
   } else {
-    chrome.tabs.create({ url: preset.url }, (newTab) => {
+    chrome.tabs.create({ url: preset.url }, (tab) => {
       function listener(tabId, changeInfo) {
-        if (tabId === newTab.id && changeInfo.status === 'complete') {
+        if (tabId === tab.id && changeInfo.status === 'complete') {
           injectPaste(tabId, 1);
           chrome.tabs.onUpdated.removeListener(listener);
         }
@@ -462,5 +415,4 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     });
   }
 });
-
 
