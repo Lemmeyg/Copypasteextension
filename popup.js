@@ -35,8 +35,11 @@ function setupAccordion(presetElement, presetData) {
     <label><input type="checkbox" class="auto-submit-input" ${presetData.autoSubmit ? 'checked' : ''} /> Auto-submit after paste</label>
     <label><input type="checkbox" class="reuse-tab-input" ${presetData.reuseTab ? 'checked' : ''} /> Reuse existing tab for this domain</label>
     <div class="button-container">
-      <button class="cancel-btn">Cancel</button>
-      <button class="save-btn">Save</button>
+      <button class="delete-btn">Delete</button>
+      <div class="right-buttons">
+        <button class="cancel-btn">Cancel</button>
+        <button class="save-btn">Save</button>
+      </div>
     </div>
   `;
   
@@ -62,11 +65,12 @@ function setupAccordion(presetElement, presetData) {
   });
   
   // Handle save button
-  editOptions.querySelector('.save-btn').addEventListener('click', function() {
+  editOptions.querySelector('.save-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
     const updatedData = {
       name: editOptions.querySelector('.preset-name-input').value,
       url: editOptions.querySelector('.preset-url-input').value,
-      selector: editOptions.querySelector('.preset-selector-input').value,
+      selector: presetData.selector,
       autoSubmit: editOptions.querySelector('.auto-submit-input').checked,
       reuseTab: editOptions.querySelector('.reuse-tab-input').checked
     };
@@ -80,9 +84,16 @@ function setupAccordion(presetElement, presetData) {
   });
   
   // Handle cancel button
-  editOptions.querySelector('.cancel-btn').addEventListener('click', function() {
+  editOptions.querySelector('.cancel-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
     presetElement.classList.remove('expanded');
     editOptions.classList.remove('open');
+  });
+  
+  // Handle delete button
+  editOptions.querySelector('.delete-btn').addEventListener('click', function(e) {
+    e.stopPropagation();
+    deletePreset(presetData.id, presetData.name);
   });
 }
 
@@ -155,18 +166,25 @@ async function savePresetData(presetId, updatedData) {
       reuseTab: updatedData.reuseTab
     }
     presets.push(preset)
+    console.log("[Popup] Created new preset:", preset);
   } else {
     // Update existing
     preset.name = name
     preset.autoSubmit = updatedData.autoSubmit
     preset.reuseTab = updatedData.reuseTab
+    console.log("[Popup] Updated existing preset:", preset);
   }
 
   await chrome.storage.sync.set({ presets })
   log("Preset saved")
-  loadPresets()
-
-  chrome.runtime.sendMessage({ type: "updateContextMenu" })
+  
+  // Update context menu in background
+  chrome.runtime.sendMessage({ type: "updateContextMenu" }, (response) => {
+    console.log("[Popup] Context menu update response:", response);
+  });
+  
+  // Reload presets from storage
+  await loadPresets()
 
   if (inExtensionTab) {
     setTimeout(() => {
@@ -178,6 +196,41 @@ async function savePresetData(presetId, updatedData) {
       }
     }, 800)
   }
+}
+
+async function deletePreset(presetId, presetName) {
+  console.log("[Popup] deletePreset called!");
+  console.log("[Popup] Preset ID:", presetId);
+  console.log("[Popup] Preset Name:", presetName);
+  
+  // Confirm deletion
+  const confirmDelete = confirm(`Are you sure you want to delete the preset "${presetName}"?`);
+  console.log("[Popup] User confirmed deletion:", confirmDelete);
+  
+  if (!confirmDelete) {
+    console.log("[Popup] Deletion cancelled by user");
+    return;
+  }
+  
+  console.log("[Popup] Proceeding with deletion...");
+  
+  // Remove the preset from the array
+  presets = presets.filter(p => p.id !== presetId);
+  console.log("[Popup] Presets after deletion:", presets);
+  
+  // Save updated presets to storage
+  await chrome.storage.sync.set({ presets });
+  console.log("[Popup] Storage updated");
+  
+  log(`Preset "${presetName}" deleted`);
+  
+  // Update context menu in background
+  chrome.runtime.sendMessage({ type: "updateContextMenu" }, (response) => {
+    console.log("[Popup] Context menu update response:", response);
+  });
+  
+  // Reload the preset list from storage
+  await loadPresets();
 }
 
 // Keep old functions for backward compatibility with old edit section
@@ -233,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const readmeBtn = document.getElementById('readme-btn');
   if (readmeBtn) {
     readmeBtn.addEventListener('click', function() {
-      chrome.tabs.create({ url: chrome.runtime.getURL('README.txt') });
+      chrome.tabs.create({ url: chrome.runtime.getURL('README.md') });
     });
   }
 
@@ -242,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if (feedbackBtn) {
     feedbackBtn.addEventListener('click', function() {
       // Replace with your actual form URL
-      chrome.tabs.create({ url: 'https://forms.google.com/YOUR_FORM_ID' });
+      chrome.tabs.create({ url: 'https://forms.gle/kPfpwVsNqM5pHwAD8' });
     });
   }
 });

@@ -55,6 +55,31 @@ function updateContextStatus() {
   chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
 }
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === "refresh_context_status") {
+    console.log("[ContentScript] Refreshing context status on request");
+
+    const isEditable =
+      document.activeElement &&
+      (document.activeElement.isContentEditable ||
+        document.activeElement.tagName === "TEXTAREA" ||
+        (document.activeElement.tagName === "INPUT" &&
+          document.activeElement.type === "text"));
+    const hasSelection = window.getSelection().toString().length > 0;
+
+    // ✅ 1. Immediately respond to background’s sendMessage callback
+    sendResponse({ isEditable, hasSelection });
+
+    // ✅ 2. Also broadcast so background sees this even if callback fails
+    chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
+
+    // Must return true to keep sendResponse channel open asynchronously
+    return true;
+  }
+});
+
+
+
 document.addEventListener('selectionchange', updateContextStatus);
 document.addEventListener('focusin', updateContextStatus);
 document.addEventListener('focusout', updateContextStatus);

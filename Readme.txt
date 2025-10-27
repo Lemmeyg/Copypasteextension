@@ -1,22 +1,30 @@
 # Copy-Paste Extension
 
-A Chrome extension that helps you quickly paste clipboard content into specific websites with customizable presets.
+ - Tired of jumping between tabs on multiple screens just to look something up? 
+ - Frustrated by repetitive copy-paste searches?
+ - Wasting time copy and pasting, opening another browser tab, just to search or lookup?
+
+ - Try one-click searching - search/lookup values, in the applications you want, with two clicks.
+
+ - Instantly lookup any highlighted text in the exact sites and apps you choose, all with a single click.
+
+ - Never copy and paste to search again.
 
 ## Features
 
-- **Quick Paste Presets**: Save your favorite websites with specific input fields
-- **Context Menu Integration**: Right-click to paste to any preset
+- **Quick Paste Presets**: Target the specific search bars input fields on specific websites and automatically submit a search for any term 
+- **Context Menu Integration**: Right-click to target and search bar
+- **Instant Search**: Right click and select your target search 
 - **Auto-Submit**: Optionally auto-submit forms after pasting
-- **Tab Reuse**: Choose whether to reuse existing tabs for each domain
 - **Easy Management**: Edit presets directly from the popup menu
 
 ## How to Use
 
-### Creating a Preset
+### Creating a Target search
 
-1. Navigate to the website where you want to paste content
+1. Navigate to the website  and search bar or input field where you want to paste your search term
 2. Right-click on the input field you want to paste into
-3. Select **"Configure Copy-Paste for this element"**
+3. Select **"Configure Copy-Paste for this element"** from the {app Name} menu
 4. Give your preset a memorable name
 5. Configure options:
    - **Auto-submit after paste**: Automatically submit the form after pasting
@@ -24,11 +32,10 @@ A Chrome extension that helps you quickly paste clipboard content into specific 
 
 ### Using a Preset
 
-1. Copy any text to your clipboard
-2. Right-click anywhere on a webpage
-3. Hover over **"Paste to..."** in the context menu
-4. Select your preset
-5. The extension will open the website and paste your clipboard content
+1. Select, then right click, any text to your webpage
+2. Select {app name} in your context menu
+3. Select the search target your want
+4. View the search results.
 
 ### Managing Presets
 
@@ -46,14 +53,9 @@ A Chrome extension that helps you quickly paste clipboard content into specific 
 ## Common Use Cases
 
 - **Search Engines**: Quickly paste and search on Google, Bing, DuckDuckGo
-- **AI Tools**: Paste prompts into ChatGPT, Claude, or other AI assistants
-- **Shopping**: Paste product codes into retailer search boxes
-- **Development**: Paste code into online compilers or documentation searches
-- **Research**: Paste terms into academic databases or library catalogs
-
-## Keyboard Shortcuts
-
-Currently, this extension works via context menu (right-click). Keyboard shortcuts may be added in future versions.
+- **B2B Catalogues**: Paste prompts into ChatGPT, Claude, or other AI assistants
+- **Search competiting marketplaces**: Paste product codes into retailer search boxes
+- **Research**: Paste People, places or products into any webbased applications to search.
 
 ## Privacy
 
@@ -71,10 +73,13 @@ All preset configurations are stored locally and synced across your Chrome brows
 - Some websites may block automated input due to security policies
 - Try refreshing the page after the paste
 - Some sites may require manual interaction before submission
+- Submit a feedback form with the URL and Element you are trying to target. 
 
-**Can't find the context menu option**
-- Make sure you're right-clicking on a text input field or textarea
-- The extension requires an active input element to configure
+**Can't find the 'Add as a Target Search" option**
+- Make sure you have an element that allows serarch termsor input before clicking
+
+**Can't find my prefered Preset Seatch Target.
+- Make sure you have some text highlighted before clicking
 
 **Preset not appearing in list**
 - Try reloading the extension from chrome://extensions

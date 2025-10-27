@@ -186,7 +186,7 @@
 
     .preset-edit-options .button-container {
       display: flex;
-      justify-content: flex-end;
+      justify-content: space-between;
       gap: 8px;
       margin-top: 10px;
     }
@@ -200,6 +200,25 @@
       cursor: pointer;
       transition: all 0.15s ease;
       font-family: inherit;
+    }
+
+    .preset-edit-options .delete-btn {
+      background-color: hsl(0, 70%, 50%);
+      color: white;
+    }
+
+    .preset-edit-options .delete-btn:hover {
+      background-color: hsl(0, 70%, 45%);
+      transform: translateY(-1px);
+    }
+
+    .preset-edit-options .delete-btn:active {
+      transform: translateY(0);
+    }
+
+    .preset-edit-options .right-buttons {
+      display: flex;
+      gap: 8px;
     }
 
     .preset-edit-options .save-btn {
@@ -381,7 +400,7 @@
     <label for="preset-selector">Element Selector</label>
     <input type="text" id="preset-selector" disabled />
     <label><input type="checkbox" id="auto-submit" /> Auto-submit after paste</label>
-    <!--<label><input type="checkbox" id="reuse-tab" /> Reuse existing tab for this domain</label> -->
+    <label><input type="checkbox" id="reuse-tab" /> Reuse existing tab for this domain</label>
     <button id="save-preset">Save</button>
     <button id="cancel-edit">Cancel</button>
     <div id="log"></div>
