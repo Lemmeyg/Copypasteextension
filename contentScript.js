@@ -1,18 +1,78 @@
-// Modified duplicate check - allow re-initialization
-if (window.__CONTENT_SCRIPT_LOADED__) {
-  console.log("[ContentScript] Already loaded, re-initializing listeners");
-  // Don't return - allow re-initialization of message listeners
+// Prevent duplicate event listener registration
+if (!window.__CONTENT_SCRIPT_INITIALIZED__) {
+  console.log("[ContentScript] Initializing for the first time");
+  window.__CONTENT_SCRIPT_INITIALIZED__ = true;
+  
+  // Event listeners for context status
+  function updateContextStatus() {
+    const isEditable =
+      document.activeElement &&
+      (document.activeElement.isContentEditable ||
+        document.activeElement.tagName === "TEXTAREA" ||
+        (document.activeElement.tagName === "INPUT" &&
+          (document.activeElement.type === "text" ||
+           document.activeElement.type === "search" ||
+           document.activeElement.type === "email" ||
+           document.activeElement.type === "url")));
+
+    const hasSelection = window.getSelection().toString().length > 0;
+
+    if (chrome.runtime?.id) {
+      try {
+        chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
+      } catch (err) {
+        console.warn("[ContentScript] Failed to send contextStatus:", err.message);
+      }
+    }
+  }
+
+  document.addEventListener('selectionchange', updateContextStatus);
+  document.addEventListener('focusin', updateContextStatus);
+  document.addEventListener('focusout', updateContextStatus);
+
+  // Initial status update
+  updateContextStatus();
+  
+  console.log("[ContentScript] Event listeners attached");
+} else {
+  console.log("[ContentScript] Already initialized, skipping event listener setup");
 }
-window.__CONTENT_SCRIPT_LOADED__ = true;
 
-// ----------------------------------------------------------------------------------------
-
-console.log("[ContentScript] Loaded");
-
+// Message listener - always register (safe to register multiple times)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // Add ping handler for connection testing
   if (message.type === "ping") {
     sendResponse({ success: true });
+    return true;
+  }
+
+  if (message.type === "force_refresh_status") {
+    console.log("[ContentScript] Force refresh status requested");
+    
+    // Re-calculate context status immediately
+    const isEditable =
+      document.activeElement &&
+      (document.activeElement.isContentEditable ||
+        document.activeElement.tagName === "TEXTAREA" ||
+        (document.activeElement.tagName === "INPUT" &&
+          (document.activeElement.type === "text" ||
+           document.activeElement.type === "search" ||
+           document.activeElement.type === "email" ||
+           document.activeElement.type === "url")));
+
+    const hasSelection = window.getSelection().toString().length > 0;
+
+    console.log("[ContentScript] Forced status - isEditable:", isEditable, "hasSelection:", hasSelection);
+
+    if (chrome.runtime?.id) {
+      try {
+        chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
+        sendResponse({ success: true });
+      } catch (err) {
+        console.warn("[ContentScript] Failed to send forced contextStatus:", err.message);
+        sendResponse({ success: false, error: err.message });
+      }
+    }
+    
     return true;
   }
 
@@ -21,7 +81,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
       console.warn("[ContentScript] No active input or textarea element");
       sendResponse({ success: false, error: "No active editable element" });
-      return;
+      return true;
     }
 
     let selector = "";
@@ -37,6 +97,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       url: document.location.href,
       tagName: el.tagName
     });
+    return true;
   }
 
   if (message.type === "SET_INPUT_VALUE") {
@@ -55,100 +116,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     } else {
       sendResponse({ success: false, error: "Input not found" });
     }
-  }
-
-  if (message.type === "requestContextStatus") {
-    updateContextStatus();
-    sendResponse({ success: true });
-  }
-
-  // Respond to refresh request from background
-  if (message.type === "refresh_context_status") {
-    console.log("[ContentScript] Refreshing context status on request");
-
-    const isEditable =
-      document.activeElement &&
-      (document.activeElement.isContentEditable ||
-        document.activeElement.tagName === "TEXTAREA" ||
-        (document.activeElement.tagName === "INPUT" &&
-          (document.activeElement.type === "text" ||
-           document.activeElement.type === "search" ||
-           document.activeElement.type === "email" ||
-           document.activeElement.type === "url")));
-
-    const hasSelection = window.getSelection().toString().length > 0;
-
-    // Immediately respond to background sendMessage callback
-    sendResponse({ isEditable, hasSelection });
-
-    // Also broadcast normally
-    if (chrome.runtime?.id) {
-      try {
-        chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
-      } catch (err) {
-        console.warn("[ContentScript] Failed to broadcast contextStatus:", err.message);
-      }
-    }
-
     return true;
   }
 
   return true;
 });
 
-function updateContextStatus() {
-  const isEditable =
-    document.activeElement &&
-    (document.activeElement.isContentEditable ||
-      document.activeElement.tagName === "TEXTAREA" ||
-      (document.activeElement.tagName === "INPUT" &&
-        (document.activeElement.type === "text" ||
-         document.activeElement.type === "search" ||
-         document.activeElement.type === "email" ||
-         document.activeElement.type === "url")));
-
-  const hasSelection = window.getSelection().toString().length > 0;
-
-  console.log("[ContentScript] Context status - editable:", isEditable, "selection:", hasSelection);
-
-  // Check if extension context is still valid before sending message
-  if (chrome.runtime?.id) {
-    try {
-      chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
-    } catch (err) {
-      console.warn("[ContentScript] Failed to send contextStatus - extension context may be invalidated:", err.message);
-      removeEventListeners();
-    }
-  } else {
-    console.warn("[ContentScript] Extension context invalidated - removing event listeners");
-    removeEventListeners();
-  }
-}
-
-let listenersAttached = false;
-
-function attachEventListeners() {
-  if (listenersAttached) return;
-
-  document.addEventListener('selectionchange', updateContextStatus);
-  document.addEventListener('focusin', updateContextStatus);
-  document.addEventListener('focusout', updateContextStatus);
-
-  listenersAttached = true;
-  console.log("[ContentScript] Event listeners attached");
-}
-
-function removeEventListeners() {
-  if (!listenersAttached) return;
-
-  document.removeEventListener('selectionchange', updateContextStatus);
-  document.removeEventListener('focusin', updateContextStatus);
-  document.removeEventListener('focusout', updateContextStatus);
-
-  listenersAttached = false;
-  console.log("[ContentScript] Event listeners removed due to invalid context");
-}
-
-// Initialize
-attachEventListeners();
-updateContextStatus();
+console.log("[ContentScript] Message listener registered");
