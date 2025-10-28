@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NoMoreCopyAndPaste - Chrome Extension</title>
+    <title>SearchSync - Professional Guide</title>
     <style>
         * {
             margin: 0;
@@ -12,524 +12,700 @@
         }
 
         :root {
-            /* Simplified color palette with better contrast */
-            --primary: #1e40af;
-            --text: #1f2937;
-            --text-light: #6b7280;
+            --primary: #1e3a8a;
+            --primary-light: #3b82f6;
+            --accent: #0891b2;
+            --success: #059669;
+            --text: #0f172a;
+            --text-medium: #475569;
+            --text-light: #64748b;
             --bg: #ffffff;
-            --bg-light: #f9fafb;
-            --border: #e5e7eb;
-            /* </CHANGE> */
-        }
-
-        html {
-            scroll-behavior: smooth;
+            --bg-light: #f8fafc;
+            --bg-accent: #f0f9ff;
+            --border: #e2e8f0;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 6px rgba(0,0,0,0.07);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            line-height: 1.5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
             color: var(--text);
-            background: var(--bg);
+            background: var(--bg-light);
         }
 
-        /* Compact header with reduced spacing */
-        header {
-            background: var(--bg);
-            border-bottom: 2px solid var(--primary);
-            padding: 1.5rem 0;
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%);
+            color: white;
+            padding: 3rem 1rem;
+            box-shadow: var(--shadow-lg);
         }
 
-        header .container {
-            max-width: 1000px;
+        .header-content {
+            max-width: 900px;
             margin: 0 auto;
-            padding: 0 1.5rem;
         }
 
-        header h1 {
-            font-size: 1.75rem;
+        .header h1 {
+            font-size: 2.25rem;
             font-weight: 700;
-            color: var(--text);
+            margin-bottom: 0.75rem;
+            letter-spacing: -0.025em;
         }
-        /* </CHANGE> */
+
+        .header .tagline {
+            font-size: 1.25rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
 
         .container {
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
-            padding: 0 1.5rem;
+            padding: 2.5rem 1rem;
         }
 
-        /* Reduced section padding for compactness */
-        section {
-            padding: 2rem 1.5rem;
-            border-bottom: 1px solid var(--border);
+        .value-prop {
+            background: white;
+            border-radius: 8px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+            border-top: 4px solid var(--primary);
         }
 
-        section h2 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text);
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--primary);
-        }
-
-        section h3 {
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text);
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-        }
-
-        section p {
-            color: var(--text-light);
-            margin-bottom: 0.75rem;
-            line-height: 1.6;
-        }
-        /* </CHANGE> */
-
-        /* Compact problem statements section */
-        .problems {
-            background: var(--bg-light);
-            padding: 1.5rem;
-        }
-
-        .problems ul {
-            list-style: none;
-            margin: 0;
-        }
-
-        .problems li {
-            font-size: 1rem;
-            color: var(--text);
-            margin-bottom: 0.5rem;
-            padding-left: 1.25rem;
-            position: relative;
-            line-height: 1.5;
-        }
-
-        .problems li:before {
-            content: "•";
-            position: absolute;
-            left: 0;
+        .value-prop h2 {
             color: var(--primary);
-            font-weight: bold;
+            font-size: 1.75rem;
+            margin-bottom: 1.25rem;
+            font-weight: 700;
         }
-        /* </CHANGE> */
 
-        /* Simplified solution section with better contrast */
-        .solution {
+        .value-prop-subtitle {
+            color: var(--text-medium);
+            font-size: 1.125rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.7;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: start;
+            gap: 1rem;
+        }
+
+        .benefit-icon {
             background: var(--primary);
             color: white;
-            padding: 1.5rem;
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-weight: 700;
+            font-size: 1.125rem;
         }
 
-        .solution p {
-            font-size: 1rem;
+        .benefit-text {
+            color: var(--text-medium);
+            font-size: 0.9375rem;
             line-height: 1.6;
-            margin-bottom: 0.5rem;
-            color: white;
         }
 
-        .solution p:last-child {
-            margin-bottom: 0;
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .section h2 {
+            color: var(--text);
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid var(--bg-light);
+            font-weight: 700;
+        }
+
+        .section h3 {
+            color: var(--text);
+            font-size: 1.25rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
             font-weight: 600;
         }
-        /* </CHANGE> */
 
-        /* Compact feature list */
-        .feature-list {
-            margin: 0;
-            padding-left: 1.25rem;
+        .section h3:first-of-type {
+            margin-top: 0;
         }
 
-        .feature-list li {
-            margin-bottom: 0.75rem;
-            color: var(--text-light);
+        .section p {
+            color: var(--text-medium);
+            margin-bottom: 1rem;
+            line-height: 1.7;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.25rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--bg-light);
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-light);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .feature-card h3 {
+            color: var(--primary);
+            font-size: 1.125rem;
+            margin: 0 0 0.75rem 0;
+            font-weight: 600;
+        }
+
+        .feature-card p {
+            color: var(--text-medium);
+            margin: 0;
+            font-size: 0.9375rem;
             line-height: 1.6;
         }
 
-        .feature-list strong {
+        .steps {
+            counter-reset: step-counter;
+            list-style: none;
+            padding: 0;
+        }
+
+        .steps li {
+            counter-increment: step-counter;
+            position: relative;
+            padding-left: 3.5rem;
+            margin-bottom: 1.75rem;
+            color: var(--text-medium);
+            line-height: 1.7;
+        }
+
+        .steps li:before {
+            content: counter(step-counter);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 2.25rem;
+            height: 2.25rem;
+            background: var(--primary);
+            color: white;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 1rem;
+        }
+
+        .steps strong {
             color: var(--text);
             font-weight: 600;
         }
-        /* </CHANGE> */
 
-        /* Streamlined collapsible sections */
-        .collapsible {
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            margin-bottom: 0.75rem;
+        .use-case-grid {
+            display: grid;
+            gap: 1.25rem;
+            margin-top: 1.5rem;
         }
 
-        .collapsible-header {
-            padding: 0.875rem 1rem;
+        .use-case {
+            background: var(--bg-accent);
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+
+        .use-case h4 {
+            color: var(--primary);
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .use-case ul {
+            margin-left: 1.5rem;
+            color: var(--text-medium);
+        }
+
+        .use-case li {
+            margin-bottom: 0.625rem;
+            line-height: 1.6;
+        }
+
+        .best-practices {
+            background: var(--bg-light);
+            border-left: 4px solid var(--success);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+
+        .best-practices h4 {
+            color: var(--success);
+            font-size: 1.125rem;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+
+        .best-practices ul {
+            margin-left: 1.5rem;
+            color: var(--text-medium);
+        }
+
+        .best-practices li {
+            margin-bottom: 0.625rem;
+            line-height: 1.6;
+        }
+
+        .accordion {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 1rem;
+            background: white;
+        }
+
+        .accordion-header {
+            background: var(--bg-light);
+            padding: 1.125rem 1.5rem;
             cursor: pointer;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: var(--bg);
-            transition: background 0.15s;
-        }
-
-        .collapsible-header:hover {
-            background: var(--bg-light);
-        }
-
-        .collapsible-header h3 {
-            font-size: 1rem;
+            transition: background 0.2s;
             font-weight: 600;
             color: var(--text);
-            margin: 0;
         }
 
-        .collapsible-icon {
+        .accordion-header:hover {
+            background: #e2e8f0;
+        }
+
+        .accordion-icon {
             transition: transform 0.2s;
             color: var(--primary);
-            font-size: 0.875rem;
+            font-weight: 700;
+            font-size: 1.125rem;
         }
 
-        .collapsible.active .collapsible-icon {
+        .accordion.active .accordion-icon {
             transform: rotate(180deg);
         }
 
-        .collapsible-content {
+        .accordion-content {
             max-height: 0;
             overflow: hidden;
-            transition: max-height 0.2s ease;
+            transition: max-height 0.3s ease;
         }
 
-        .collapsible.active .collapsible-content {
-            max-height: 1500px;
+        .accordion.active .accordion-content {
+            max-height: 2000px;
         }
 
-        .collapsible-inner {
-            padding: 1rem;
+        .accordion-body {
+            padding: 1.5rem;
             border-top: 1px solid var(--border);
         }
-        /* </CHANGE> */
 
-        /* Compact lists */
-        ul, ol {
-            margin-left: 1.25rem;
-            margin-bottom: 0.75rem;
+        .accordion-body ul {
+            margin-left: 1.5rem;
+            color: var(--text-medium);
         }
 
-        li {
-            margin-bottom: 0.5rem;
-            color: var(--text-light);
+        .accordion-body li {
+            margin-bottom: 0.625rem;
             line-height: 1.6;
         }
 
-        strong {
-            color: var(--text);
-            font-weight: 600;
-        }
-        /* </CHANGE> */
-
         code {
             background: var(--bg-light);
-            padding: 0.125rem 0.375rem;
-            border-radius: 3px;
-            font-family: 'Courier New', monospace;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
             font-size: 0.875rem;
-            color: var(--primary);
+            color: var(--accent);
+            border: 1px solid var(--border);
         }
 
-        /* Simplified footer */
-        footer {
-            background: var(--text);
-            color: white;
-            text-align: center;
-            padding: 1.5rem;
-            font-size: 0.875rem;
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.25rem;
+            margin: 1.5rem 0;
         }
-        /* </CHANGE> */
+
+        .stat-card {
+            background: var(--bg-light);
+            padding: 1.5rem;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-medium);
+            font-size: 0.9375rem;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 2.5rem 1rem;
+            color: var(--text-light);
+            font-size: 0.875rem;
+            border-top: 1px solid var(--border);
+            background: white;
+        }
+
+        .technical-specs {
+            background: var(--bg-light);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+        }
+
+        .technical-specs ul {
+            margin-left: 1.5rem;
+            color: var(--text-medium);
+        }
+
+        .technical-specs li {
+            margin-bottom: 0.625rem;
+            line-height: 1.6;
+        }
 
         @media (max-width: 768px) {
-            header h1 {
-                font-size: 1.5rem;
+            .header h1 {
+                font-size: 1.75rem;
             }
             
-            section {
-                padding: 1.5rem 1rem;
+            .header .tagline {
+                font-size: 1rem;
+            }
+
+            .section, .value-prop {
+                padding: 1.75rem;
+            }
+
+            .feature-grid, .benefits-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .steps li {
+                padding-left: 3rem;
+            }
+
+            .steps li:before {
+                width: 2rem;
+                height: 2rem;
+                font-size: 0.875rem;
             }
         }
     </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>NoMoreCopyAndPaste</h1>
+    <div class="header">
+        <div class="header-content">
+            <h1>SearchSync</h1>
+            <p class="tagline">Customizable Instant Cross-platform Search - saving time, Streamline workflows and boost productivity  and no more copy-and-paste!</p>
         </div>
-    </header>
+    </div>
 
-    <section class="problems">
-        <div class="container">
-            <ul>
-                <li>Tired of jumping between tabs on multiple screens just to look something up?</li>
-                <li>Frustrated by repetitive copy-paste searches?</li>
-                <li>Wasting time copy and pasting, opening another browser tab, just to search or lookup?</li>
-            </ul>
-        </div>
-    </section>
-
-    <section class="solution">
-        <div class="container">
-            <p>Try one-click searching - search/lookup values, in the applications you want, with two clicks.</p>
-            <p>Instantly lookup any highlighted text in the exact sites and apps you choose, all with a single click.</p>
-            <p>Never copy and paste to search again.</p>
-        </div>
-    </section>
-
-    <section id="features">
-        <div class="container">
-            <h2>Features</h2>
-            <ul class="feature-list">
-                <li><strong>Quick Paste Presets:</strong> Target the specific search bars input fields on specific websites and automatically submit a search for any term</li>
-                <li><strong>Context Menu Integration:</strong> Right-click to target and search bar</li>
-                <li><strong>Instant Search:</strong> Right click and select your target search</li>
-                <li><strong>Auto-Submit:</strong> Optionally auto-submit forms after pasting</li>
-                <li><strong>Easy Management:</strong> Edit presets directly from the popup menu</li>
-            </ul>
-        </div>
-    </section>
-
-    <section id="how-to-use">
-        <div class="container">
-            <h2>How to Use</h2>
+    <div class="container">
+        <div class="value-prop">
+            <h2>Eliminate Repetitive Search Tasks</h2>
+            <p class="value-prop-subtitle">Stop wasting time switching between tabs, copying data, and performing manual searches. SearchSync enables teams to search across multiple platforms instantly, reducing task completion time and minimizing workflow interruptions.</p>
             
-            <div class="collapsible active">
-                <div class="collapsible-header">
-                    <h3>Creating a Target search</h3>
-                    <span class="collapsible-icon">▼</span>
+            <div class="benefits-grid">
+                <div class="benefit-item">
+                    <div class="benefit-icon">✓</div>
+                    <div class="benefit-text">Reduce average search time less than a second</div>
                 </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ol>
-                            <li>Navigate to the website and search bar or input field where you want to paste your search term</li>
-                            <li>Right-click on the input field you want to paste into</li>
-                            <li>Select <strong>"Configure Copy-Paste for this element"</strong> from the NoMoreCopyAndPaste menu</li>
-                            <li>Give your preset a memorable name</li>
-                            <li>Configure options:
-                                <ul>
-                                    <li><strong>Auto-submit after paste:</strong> Automatically submit the form after pasting</li>
-                                    <li><strong>Reuse existing tab:</strong> Open the same domain in an existing tab instead of creating new ones</li>
-                                </ul>
-                            </li>
-                        </ol>
-                    </div>
+                <div class="benefit-item">
+                    <div class="benefit-icon">✓</div>
+                    <div class="benefit-text">Minimize tab switch and searching for the right page</div>
                 </div>
-            </div>
-
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Using a Preset</h3>
-                    <span class="collapsible-icon">▼</span>
+                <div class="benefit-item">
+                    <div class="benefit-icon">✓</div>
+                    <div class="benefit-text">Two clicks to load the search results you need</div>
                 </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ol>
-                            <li>Select, then right click, any text to your webpage</li>
-                            <li>Select NoMoreCopyAndPaste in your context menu</li>
-                            <li>Select the search target your want</li>
-                            <li>View the search results.</li>
-                        </ol>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Managing Presets</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ol>
-                            <li>Click the extension icon in your toolbar</li>
-                            <li>Click on any preset to expand it</li>
-                            <li>Edit the preset name or settings</li>
-                            <li>Click <strong>Save</strong> to update or <strong>Cancel</strong> to discard changes</li>
-                        </ol>
-                    </div>
+                <div class="benefit-item">
+                    <div class="benefit-icon">✓</div>
+                    <div class="benefit-text">Integrate seamlessly with existing web-based business tools</div>
                 </div>
             </div>
         </div>
-    </section>
 
-    <section id="tips">
-        <div class="container">
-            <h2>Tips</h2>
-            <ul class="feature-list">
-                <li>Use descriptive names for your presets (e.g., "Google Search", "ChatGPT Prompt")</li>
-                <li>Enable "Auto-submit" for search boxes to save a click</li>
-                <li>Enable "Reuse existing tab" to avoid cluttering your browser with multiple tabs</li>
-            </ul>
+        <div class="section">
+            <h2>Implementation Guide</h2>
+            
+            <h3>Setting Up Search Targets</h3>
+            <ol class="steps">
+                <li>Navigate to the website containing the search tool you frequently use</li>
+                <li>Click inside the search bar or input field</li>
+                <li>Right-click and select <strong>"Add as Paste Target"</strong> from the context menu</li>
+                <li>Assign a descriptive name that identifies the search destination (e.g., "Salesforce Accounts" or "Parts Catalogue")</li>
+                <li>Configure auto-submit and tab reuse options based on your workflow requirements</li>
+            </ol>
+
+            <h3>Executing Searches</h3>
+            <ol class="steps">
+                <li>Highlight relevant text on any webpage</li>
+                <li>Right-click and navigate to <strong>"SearchSync"</strong></li>
+                <li>Select your configured search target from the menu</li>
+                <li>The extension automatically opens the destination and executes the search</li>
+            </ol>
         </div>
-    </section>
 
-    <section>
-        <div class="container">
-            <h2>Common Use Cases</h2>
-            <ul class="feature-list">
-                <li><strong>Search Engines:</strong> Quickly paste and search on Google, Bing, DuckDuckGo</li>
-                <li><strong>B2B Catalogues:</strong> Paste prompts into ChatGPT, Claude, or other AI assistants</li>
-                <li><strong>Search competing marketplaces:</strong> Paste product codes into retailer search boxes</li>
-                <li><strong>Research:</strong> Paste People, places or products into any webbased applications to search.</li>
-            </ul>
+        <div class="section">
+            <h2>Core Capabilities</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>Instant Cross-Platform Search</h3>
+                    <p>Execute searches across multiple business applications without manual navigation or data entry</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Customizable Search Targets</h3>
+                    <p>Configure up to 10 different search destinations tailored to your business processes</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Automated Form Submission</h3>
+                    <p>Eliminate manual clicking with automatic search execution upon data insertion</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Intelligent Tab Management</h3>
+                    <p>Reuse existing browser tabs to maintain an organized workspace and reduce memory usage</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Centralized Configuration</h3>
+                    <p>Manage all search targets through an intuitive interface with easy editing and deletion</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Enterprise-Grade Privacy</h3>
+                    <p>Zero data collection or external transmission - all configurations remain local</p>
+                </div>
+            </div>
         </div>
-    </section>
 
-    <section id="privacy">
-        <div class="container">
-            <h2>Privacy</h2>
-            <p>This extension:</p>
-            <ul class="feature-list">
-                <li>Does NOT collect any data</li>
-                <li>Does NOT track your browsing</li>
-                <li>Does NOT send information to external servers</li>
-                <li>Stores presets locally in your browser using Chrome's sync storage</li>
-            </ul>
-            <p>All preset configurations are stored locally and synced across your Chrome browsers if you're signed in.</p>
+        <div class="section">
+            <h2>Business Applications</h2>
+            <div class="use-case-grid"></div>
+                              <div class="use-case">
+                    <h4>Operations & Procurement</h4>
+                    <ul>
+                        <li>Compare product availability across supplier and vendor portals</li>
+                        <li>Search inventory management systems and ERP platforms</li>
+                        <li>Verify shipping and tracking information across carrier websites</li>
+                        <li>Cross-reference part numbers and SKUs across multiple catalogs</li>
+                    </ul>
+                </div>
+                
+                <div class="use-case">
+                    <h4>Customer Support & Success</h4>
+                    <ul>
+                        <li>Instantly search customer records across CRM platforms (Salesforce, HubSpot, Zendesk)</li>
+                        <li>Look up support tickets and case histories without switching contexts</li>
+                        <li>Search knowledge bases and documentation for rapid issue resolution</li>
+                        <li>Cross-reference customer data across multiple business systems</li>
+                    </ul>
+                </div>
+
+                <div class="use-case">
+                    <h4>Sales & Business Development</h4>
+                    <ul>
+                        <li>Search prospect information across LinkedIn Sales Navigator and CRM systems</li>
+                        <li>Quickly verify company details in business intelligence platforms</li>
+                        <li>Compare pricing across competitor websites and marketplaces</li>
+                        <li>Research potential leads across multiple data sources simultaneously</li>
+                    </ul>
+                </div>
+                <div class="use-case">
+                    <h4>Human Resources & Recruiting</h4>
+                    <ul>
+                        <li>Search candidate profiles across LinkedIn, Indeed, and ATS platforms</li>
+                        <li>Look up employee information in HRIS and benefits systems</li>
+                        <li>Research compensation data across salary benchmarking tools</li>
+                        <li>Query training resources and learning management systems</li>
+                    </ul>
+                </div>
+            </div>
         </div>
-    </section>
 
-    <section>
-        <div class="container">
+      
+        <div class="section">
             <h2>Troubleshooting</h2>
+
+            <div class="accordion active">
+                <div class="accordion-header">
+                    <span>Context menu options are disabled or unavailable</span>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-body">
+                        <ul>
+                            <li>Right-click and select <strong>"Refresh"</strong> to update the extension's current state</li>
+                            <li>Ensure you have clicked inside an input field before attempting to add it as a target</li>
+                            <li>Verify that text is highlighted before accessing search targets</li>
+                            <li>Reload the webpage if the extension appears unresponsive</li>
+                            <li>Check that the extension is enabled in chrome://extensions/</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header">
+                    <span>Search target incompatible with specific platform</span>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-body">
+                        <ul>
+                            <li>Enterprise applications may implement security policies that restrict automated input</li>
+                            <li>Disable auto-submit and manually execute searches as a workaround</li>
+                            <li>Platform UI updates may require recreating the search target</li>
+                            <li>Single sign-on (SSO) pages may require manual authentication before automated searches function</li>
+                            <li>Contact your IT department if persistent issues occur with internal business applications</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header">
+                    <span>"Add as Paste Target" option not appearing</span>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-body">
+                        <ul>
+                            <li>Confirm you have clicked directly inside a text input field or search box</li>
+                            <li>The element must accept text input (standard input fields, textareas, or contenteditable elements)</li>
+                            <li>Use the "Refresh" option in the context menu to reset the extension state</li>
+                            <li>Some shadow DOM implementations may prevent element detection</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header">
+                    <span>Configured search targets not displaying in menu</span>
+                    <span class="accordion-icon">▼</span>
+                </div>
+                <div class="accordion-content">
+                    <div class="accordion-body">
+                        <ul>
+                            <li>Search targets only appear when text is selected on the current page</li>
+                            <li>Verify targets are saved by clicking the extension icon to view all configurations</li>
+                            <li>Reload the extension from chrome://extensions/ if synchronization issues persist</li>
+                            <li>Check Chrome sync settings if configurations are missing across devices</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Configuration Management</h2>
             
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Preset doesn't work on a website</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ul>
-                            <li>Some websites may block automated input due to security policies</li>
-                            <li>Try refreshing the page after the paste</li>
-                            <li>Some sites may require manual interaction before submission</li>
-                            <li>Submit a feedback form with the URL and Element you are trying to target.</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+            <h3>Viewing All Search Targets</h3>
+            <p>Click the extension icon in your browser toolbar to access the management interface displaying all configured search targets.</p>
 
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Can't find the 'Add as a Target Search" option</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ul>
-                            <li>Make sure you have an element that allows search terms or input before clicking</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+            <h3>Modifying Search Targets</h3>
+            <ol class="steps">
+                <li>Click the extension icon to open the configuration panel</li>
+                <li>Click on any search target to expand its settings</li>
+                <li>Update the name, auto-submit preference, or tab reuse behavior</li>
+                <li>Click <strong>Save</strong> to apply changes or <strong>Cancel</strong> to revert</li>
+            </ol>
 
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Can't find my preferred Preset Search Target</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ul>
-                            <li>Make sure you have some text highlighted before clicking</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Preset not appearing in list</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ul>
-                            <li>Try reloading the extension from chrome://extensions</li>
-                            <li>Check if the preset was saved (click extension icon to view all presets)</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+            <h3>Removing Search Targets</h3>
+            <p>Expand the target in the management interface and click the <strong>Delete</strong> button. This action cannot be undone.</p>
         </div>
-    </section>
 
-    <section id="support">
-        <div class="container">
-            <h2>Support</h2>
-            <p>Having issues or suggestions? Click the <strong>Feedback</strong> button in the extension popup to submit your feedback.</p>
-        </div>
-    </section>
-
-    <section>
-        <div class="container">
-            <h2>Version History</h2>
+        <div class="section">
+            <h2>Security & Compliance</h2>
             
-            <div class="collapsible">
-                <div class="collapsible-header">
-                    <h3>Version 1.0</h3>
-                    <span class="collapsible-icon">▼</span>
-                </div>
-                <div class="collapsible-content">
-                    <div class="collapsible-inner">
-                        <ul>
-                            <li>Initial release</li>
-                            <li>Context menu integration</li>
-                            <li>Preset management UI</li>
-                            <li>Auto-submit and tab reuse options</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <section>
-        <div class="container">
-            <h2>Technical Details</h2>
+            <p><strong>Enterprise-grade privacy and security</strong></p>
             
-            <h3>Permissions Required:</h3>
-            <ul class="feature-list">
-                <li><code>contextMenus</code>: To add right-click menu options</li>
-                <li><code>storage</code>: To save your presets</li>
-                <li><code>clipboardRead</code>: To read clipboard content for pasting</li>
-                <li><code>activeTab</code>: To interact with the current webpage</li>
-                <li><code>scripting</code>: To inject paste functionality</li>
-            </ul>
+            <div class="technical-specs">
+                <ul>
+                    <li><strong>Zero data collection:</strong> No personal, business, or usage data is collected by this extension</li>
+                    <li><strong>No external communication:</strong> The extension does not transmit any information to external servers</li>
+                    <li><strong>Local storage only:</strong> All configurations are stored locally using Chrome's encrypted sync storage</li>
+                    <li><strong>No tracking or analytics:</strong> Your browsing activity and search patterns remain completely private</li>
+                    <li><strong>Open architecture:</strong> The extension operates entirely within your browser environment</li>
+                </ul>
+            </div>
 
-            <h3>Browser Compatibility:</h3>
-            <ul class="feature-list">
-                <li>Chrome 88+</li>
-                <li>Edge 88+</li>
-                <li>Other Chromium-based browsers</li>
-            </ul>
+            <p style="margin-top: 1rem;">All search target configurations are stored using Chrome's sync storage API and can synchronize across your authenticated Chrome browsers. Data remains encrypted and under your control at all times.</p>
         </div>
-    </section>
 
-    <footer>
-        <div class="container">
-            <p>&copy; 2025 NoMoreCopyAndPaste Chrome Extension</p>
+     
+
+        <div class="section">
+            <h2>Support & Feedback</h2>
+            <p>For technical support, feature requests, or to report issues, click the <strong>Feedback</strong> button in the extension popup. Your input helps us improve the product for business users.</p>
+            
+            <p style="margin-top: 1rem;">For enterprise deployment assistance or questions about integration with specific business platforms, please include relevant details about your technical environment and use case.</p>
         </div>
-    </footer>
+    </div>
+
+    <div class="footer">
+        <p>&copy; 2025 SearchSync Chrome Extension | Version 1.0 | Professional Edition</p>
+    </div>
 
     <script>
-        document.querySelectorAll('.collapsible-header').forEach(header => {
+        document.querySelectorAll('.accordion-header').forEach(header => {
             header.addEventListener('click', () => {
-                const collapsible = header.parentElement;
-                collapsible.classList.toggle('active');
+                const accordion = header.parentElement;
+                const wasActive = accordion.classList.contains('active');
+                
+                // Close all accordions
+                document.querySelectorAll('.accordion').forEach(acc => {
+                    acc.classList.remove('active');
+                });
+                
+                // Open clicked accordion if it wasn't active
+                if (!wasActive) {
+                    accordion.classList.add('active');
+                }
             });
         });
     </script>
 </body>
 </html>
-
-

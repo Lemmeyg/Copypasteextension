@@ -35,7 +35,7 @@ function updateContextMenu() {
     chrome.contextMenus.removeAll(() => {
       chrome.contextMenus.create({
         id: PARENT_ID,
-        title: "Copy-Paste Workflow",
+        title: "SearchSync",
         contexts: ["editable", "selection"]
       });
 
