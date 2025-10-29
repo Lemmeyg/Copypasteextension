@@ -314,80 +314,82 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       console.log("[Background] Content script already loaded, using existing instance");
     }
 
-    // Send message to get element info
-    chrome.tabs.sendMessage(tab.id, { type: "get_element_info" }, async (response) => {
-      if (chrome.runtime.lastError) {
-        console.error("[Background] Message failed:", chrome.runtime.lastError.message);
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => alert('Please click inside a text input field first, then right-click and select "Add as Paste Target".')
-        });
-        return;
-      }
-      
-      if (!response || !response.success) {
-        console.warn("[Background] Could not capture element info");
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => alert('Please click inside a text input field first.')
-        });
-        return;
-      }
-
-      // Prompt for name
-      const defaultName = `Paste to ${new URL(response.url).hostname}`;
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: suggestedName => prompt("Name for new paste target:", suggestedName),
-        args: [defaultName]
-      }, async (results) => {
+    // Send message to get element info - add small delay to ensure focus is stable
+    setTimeout(() => {
+      chrome.tabs.sendMessage(tab.id, { type: "get_element_info" }, async (response) => {
         if (chrome.runtime.lastError) {
-          console.error("[Background] Prompt failed:", chrome.runtime.lastError.message);
-          return;
-        }
-        
-        const name = results?.[0]?.result;
-        
-        if (!name) {
-          console.log("[Background] User cancelled");
-          return;
-        }
-
-        // Check duplicates
-        const isDuplicate = presets.some(p =>
-          p.selector === response.selector &&
-          new URL(p.url).hostname === new URL(response.url).hostname
-        );
-
-        if (isDuplicate) {
-          console.warn("[Background] Duplicate preset detected");
+          console.error("[Background] Message failed:", chrome.runtime.lastError.message);
           chrome.scripting.executeScript({
             target: { tabId: tab.id },
-            func: () => alert('A preset for this element already exists on this domain.')
+            func: () => alert('Please click inside a text input field first, then right-click and select "Add as Paste Target".')
+          });
+          return;
+        }
+        
+        if (!response || !response.success) {
+          console.warn("[Background] Could not capture element info");
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => alert('Please click inside a text input field first.')
           });
           return;
         }
 
-        const newPreset = {
-          id: Date.now().toString(),
-          name,
-          url: response.url,
-          selector: response.selector,
-          autoSubmit: true,
-          reuseTab: false
-        };
-
-        presets.push(newPreset);
-        await savePresets();
-        console.log("[Background] New preset added:", newPreset);
-
+        // Prompt for name
+        const defaultName = `Paste to ${new URL(response.url).hostname}`;
         chrome.scripting.executeScript({
           target: { tabId: tab.id },
-          func: (n) => alert(`Preset "${n}" added successfully!`),
-          args: [name]
+          func: suggestedName => prompt("Name for new paste target:", suggestedName),
+          args: [defaultName]
+        }, async (results) => {
+          if (chrome.runtime.lastError) {
+            console.error("[Background] Prompt failed:", chrome.runtime.lastError.message);
+            return;
+          }
+          
+          const name = results?.[0]?.result;
+          
+          if (!name) {
+            console.log("[Background] User cancelled");
+            return;
+          }
+
+          // Check duplicates
+          const isDuplicate = presets.some(p =>
+            p.selector === response.selector &&
+            new URL(p.url).hostname === new URL(response.url).hostname
+          );
+
+          if (isDuplicate) {
+            console.warn("[Background] Duplicate preset detected");
+            chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => alert('A preset for this element already exists on this domain.')
+            });
+            return;
+          }
+
+          const newPreset = {
+            id: Date.now().toString(),
+            name,
+            url: response.url,
+            selector: response.selector,
+            autoSubmit: true,
+            reuseTab: false
+          };
+
+          presets.push(newPreset);
+          await savePresets();
+          console.log("[Background] New preset added:", newPreset);
+
+          chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: (n) => alert(`Preset "${n}" added successfully!`),
+            args: [name]
+          });
         });
       });
-    });
+    }, 50); // 50ms delay to ensure focus is stable
     return;
   }
 

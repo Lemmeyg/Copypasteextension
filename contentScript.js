@@ -3,6 +3,18 @@ if (!window.__CONTENT_SCRIPT_INITIALIZED__) {
   console.log("[ContentScript] Initializing for the first time");
   window.__CONTENT_SCRIPT_INITIALIZED__ = true;
   
+  // Store last clicked element globally so message handler can access it
+  window.lastClickedElement = null;
+  
+  // Capture the element when user clicks
+  document.addEventListener('mousedown', (e) => {
+    const target = e.target;
+    if (target && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
+      window.lastClickedElement = target;
+      console.log("[ContentScript] Captured element on mousedown:", target.tagName);
+    }
+  }, true);
+  
   // Event listeners for context status
   function updateContextStatus() {
     const isEditable =
@@ -77,7 +89,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.type === "get_element_info") {
-    const el = document.activeElement;
+    // Try to get last clicked element first, then fall back to activeElement
+    let el = null;
+    
+    if (window.lastClickedElement && document.contains(window.lastClickedElement)) {
+      el = window.lastClickedElement;
+      console.log("[ContentScript] Using last clicked element");
+    } else {
+      el = document.activeElement;
+      console.log("[ContentScript] Using active element");
+    }
+    
     if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
       console.warn("[ContentScript] No active input or textarea element");
       sendResponse({ success: false, error: "No active editable element" });
