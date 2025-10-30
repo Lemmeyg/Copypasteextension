@@ -1,7 +1,6 @@
-console.log("[Background] Initializing extension");
+console.log("[Background] ========== INITIALIZING EXTENSION ==========");
 
 let presets = [];
-let rebuildingMenu = false;
 
 const MAX_PRESETS = 10;
 const PARENT_ID = "copyPasteRoot";
@@ -13,407 +12,315 @@ const REFRESH_STATUS_ID = "refresh_status";
 // Storage helpers
 // -----------------------------
 async function loadPresets() {
+  console.log("[Background] Loading presets...");
   const store = await chrome.storage.sync.get("presets");
   presets = store.presets || [];
-  console.log("[Background] Loaded presets:", presets);
+  console.log("[Background] Loaded", presets.length, "presets");
+  return presets;
 }
 
 async function savePresets() {
+  console.log("[Background] Saving", presets.length, "presets");
   await chrome.storage.sync.set({ presets });
-  console.log("[Background] Saved presets to storage:", presets);
   await updateContextMenu();
 }
 
 // -----------------------------
-// Context menu builder + refresh
+// Context menu builder - OPTIMISTIC APPROACH
 // -----------------------------
-function updateContextMenu() {
-  console.log("[Background] Updating context menu with", presets.length, "presets");
-  rebuildingMenu = true;
-
+async function updateContextMenu() {
+  console.log("[Background] ========== UPDATING CONTEXT MENU ==========");
+  console.log("[Background] Preset count:", presets.length);
+  
   return new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
+      // Parent menu
       chrome.contextMenus.create({
         id: PARENT_ID,
         title: "SearchSync",
-        contexts: ["editable", "selection"]
+        contexts: ["all"]
       });
+      console.log("[Background] Created parent menu");
 
+      // Add Target - ALWAYS ENABLED (optimistic)
       chrome.contextMenus.create({
         id: ADD_TARGET_ID,
         parentId: PARENT_ID,
         title: "Add as Paste Target",
-        contexts: ["editable"],
-        enabled: true
+        contexts: ["all"],
+        enabled: true  // ALWAYS ENABLED
       });
+      console.log("[Background] Created ADD_TARGET (always enabled)");
 
-      presets.forEach(preset => {
+      // Preset menus - ALWAYS ENABLED (optimistic)
+      presets.forEach((preset, index) => {
         chrome.contextMenus.create({
           id: preset.id.toString(),
           parentId: PARENT_ID,
           title: preset.name,
-          contexts: ["selection"],
-          enabled: true
+          contexts: ["all"],
+          enabled: true  // ALWAYS ENABLED
         });
+        console.log(`[Background] Created preset #${index + 1}: ${preset.name} (always enabled)`);
       });
 
+      // Refresh menu
       chrome.contextMenus.create({
         id: REFRESH_STATUS_ID,
         parentId: PARENT_ID,
         title: "Refresh",
-        contexts: ["editable", "selection"],
+        contexts: ["all"],
         enabled: true
       });
+      console.log("[Background] Created REFRESH menu");
 
+      // Configure menu
       chrome.contextMenus.create({
         id: CONFIGURE_ID,
         parentId: PARENT_ID,
         title: "Configure",
-        contexts: ["editable", "selection"],
+        contexts: ["all"],
         enabled: true
       });
+      console.log("[Background] Created CONFIGURE menu");
 
-      console.log("[Background] Context menus updated");
-
-      setTimeout(() => { 
-        rebuildingMenu = false;
-        resolve();
-      }, 150);
+      console.log("[Background] All menus created (optimistic mode)");
+      console.log("[Background] ========== MENU UPDATE COMPLETE ==========\n");
+      resolve();
     });
   });
 }
 
 // -----------------------------
-// Message listener
+// Helper: Ensure content script loaded
 // -----------------------------
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  (async () => {
-    if (!message || !message.type) return;
-    
-    console.log("[Background] Received message:", message.type);
-
-    if (message.type === "contextStatus") {
-      if (rebuildingMenu) {
-        console.log("[Background] Ignoring contextStatus during menu rebuild");
-        return;
-      }
-
-      try {
-        chrome.contextMenus.update(ADD_TARGET_ID, { enabled: !!message.isEditable }, () => {
-          if (chrome.runtime.lastError) {
-            console.warn("[Background] Could not update ADD_TARGET_ID:", chrome.runtime.lastError);
-          }
-        });
-
-        presets.forEach(preset => {
-          chrome.contextMenus.update(preset.id.toString(), { enabled: !!message.hasSelection }, () => {
-            if (chrome.runtime.lastError) {
-              console.warn("[Background] Could not update preset menu item:", preset.id);
-            }
-          });
-        });
-      } catch (err) {
-        console.warn("[Background] Error updating context menu status:", err);
-      }
-      return;
-    }
-
-    if (message.type === "updateContextMenu") {
-      console.log("[Background] Reloading presets and updating context menu");
-      await loadPresets();
-      await updateContextMenu();
-      if (sendResponse) sendResponse({ success: true });
-      return;
-    }
-
-    if (message.type === "add_preset") {
-      if (presets.length >= MAX_PRESETS) {
-        if (sendResponse) sendResponse({
-          success: false,
-          error: "Maximum of 10 preset targets reached."
-        });
-        return;
-      }
-
-      if (presets.some(p => p.selector === message.data.selector && p.url === message.data.url)) {
-        if (sendResponse) sendResponse({ success: false, error: "Duplicate preset" });
-        return;
-      }
-
-      presets.push(message.data);
-      await savePresets();
-      if (sendResponse) sendResponse({ success: true });
-      return;
-    }
-  })();
-
-  return true;
-});
-
-// -----------------------------
-// Helper: Check if content script is loaded
-// -----------------------------
-async function isContentScriptLoaded(tabId) {
-  return new Promise((resolve) => {
-    chrome.tabs.sendMessage(tabId, { type: "ping" }, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve(false);
-      } else {
-        resolve(true);
-      }
-    });
-  });
-}
-
-// -----------------------------
-// Helper: Force refresh content script status
-// -----------------------------
-async function forceRefreshStatus(tabId) {
-  console.log("[Background] Force refreshing status for tab:", tabId);
+async function ensureContentScript(tabId) {
+  console.log("[Background] Ensuring content script in tab:", tabId);
   
   try {
-    // Try to inject content script (will be idempotent due to initialization check)
+    // Try to ping existing content script
+    const response = await new Promise((resolve) => {
+      chrome.tabs.sendMessage(tabId, { type: "ping" }, (resp) => {
+        if (chrome.runtime.lastError) {
+          resolve(null);
+        } else {
+          resolve(resp);
+        }
+      });
+    });
+    
+    if (response) {
+      console.log("[Background] Content script already loaded");
+      return true;
+    }
+    
+    // Not loaded, inject it
+    console.log("[Background] Injecting content script...");
     await chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
       files: ['contentScript.js']
     });
-    console.log("[Background] Content script injected/verified");
     
-    // Small delay to ensure initialization
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // Wait for initialization
+    await new Promise(resolve => setTimeout(resolve, 100));
     
-    // Send force refresh message
-    chrome.tabs.sendMessage(tabId, { type: "force_refresh_status" }, (response) => {
-      if (chrome.runtime.lastError) {
-        console.warn("[Background] Could not send force refresh:", chrome.runtime.lastError.message);
-      } else {
-        console.log("[Background] Status refresh triggered successfully");
-      }
-    });
-    
-    // Show confirmation to user
-    await chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => {
-        const msg = document.createElement('div');
-        msg.textContent = 'Refreshed ✓';
-        msg.style.cssText = 'position:fixed;top:20px;right:20px;background:#4CAF50;color:white;padding:12px 20px;border-radius:4px;z-index:999999;font-family:system-ui;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.2)';
-        document.body.appendChild(msg);
-        setTimeout(() => msg.remove(), 2000);
-      }
-    });
+    console.log("[Background] Content script injected successfully");
+    return true;
     
   } catch (err) {
-    console.error("[Background] Error during force refresh:", err);
-    
-    // Fallback: show error message
-    chrome.scripting.executeScript({
-      target: { tabId },
-      func: () => alert('Could not refresh status. Please reload the page.')
-    });
+    console.error("[Background] Failed to ensure content script:", err);
+    return false;
   }
 }
 
 // -----------------------------
-// findReusableTab
+// Helper: Show user message
 // -----------------------------
-async function findReusableTab(urlOrigin, selector) {
-  const tabs = await chrome.tabs.query({});
-  for (let tab of tabs) {
-    try {
-      const tabURL = new URL(tab.url);
-      if (tabURL.origin === urlOrigin) {
-        const [result] = await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: sel => !!document.querySelector(sel),
-          args: [selector]
-        });
-        if (result.result) {
-          console.log("[Background] Found reusable tab:", tab.id);
-          return tab.id;
-        }
-      }
-    } catch (e) {
-      console.warn("[Background] Error checking tab:", e);
-    }
+async function showMessage(tabId, messageText) {
+  console.log("[Background] Showing message:", messageText);
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: (msg) => alert(msg),
+      args: [messageText]
+    });
+  } catch (err) {
+    console.error("[Background] Failed to show message:", err);
   }
-  return null;
 }
 
 // -----------------------------
 // Lifecycle
 // -----------------------------
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log("[Background] onInstalled event");
+  console.log("[Background] ========== ON INSTALLED ==========");
   await loadPresets();
-  updateContextMenu();
+  await updateContextMenu();
+  console.log("[Background] ========== INSTALLATION COMPLETE ==========\n");
 });
 
 chrome.runtime.onStartup.addListener(async () => {
-  console.log("[Background] onStartup event");
+  console.log("[Background] ========== ON STARTUP ==========");
   await loadPresets();
-  updateContextMenu();
+  await updateContextMenu();
+  console.log("[Background] ========== STARTUP COMPLETE ==========\n");
 });
 
 // -----------------------------
 // Context menu click handler
 // -----------------------------
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  console.log("[Background] Clicked menuItemId:", info.menuItemId);
+  console.log("[Background] ========== MENU CLICKED ==========");
+  console.log("[Background] Item:", info.menuItemId);
+  console.log("[Background] Tab:", tab.id);
 
+  // Handle Configure
   if (info.menuItemId === CONFIGURE_ID) {
+    console.log("[Background] Opening configuration...");
     try {
       await chrome.action.openPopup();
     } catch (err) {
-      console.warn("[Background] Opening in new tab instead");
       chrome.tabs.create({ url: chrome.runtime.getURL('popup.html') });
     }
     return;
   }
 
+  // Handle Refresh
   if (info.menuItemId === REFRESH_STATUS_ID) {
-    await forceRefreshStatus(tab.id);
+    console.log("[Background] Refreshing page...");
+    await showMessage(tab.id, 'Extension refreshed! You may need to reload this page for full functionality.');
     return;
   }
 
+  // Handle Add Target
   if (info.menuItemId === ADD_TARGET_ID) {
+    console.log("[Background] ========== ADD TARGET ==========");
+    
+    // Check if at max presets
     await loadPresets();
-
     if (presets.length >= MAX_PRESETS) {
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => alert('Maximum of 10 preset targets reached. Please delete one first.')
-      });
+      await showMessage(tab.id, 'Maximum of 10 preset targets reached. Please delete one first.');
       return;
     }
 
-    // Check if content script is already loaded
-    const scriptLoaded = await isContentScriptLoaded(tab.id);
-    
-    if (!scriptLoaded) {
-      console.log("[Background] Content script not loaded, injecting...");
-      try {
-        await chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          files: ['contentScript.js']
-        });
-        console.log("[Background] Content script injected");
+    // Get element info directly from the page (check document.activeElement)
+    console.log("[Background] Getting active element info...");
+    const [result] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: () => {
+        const el = document.activeElement;
         
-        // Small delay to ensure initialization
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Check if it's a valid input/textarea
+        if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
+          return { success: false, error: "Not a valid input element" };
+        }
         
-      } catch (err) {
-        console.error("[Background] Content script injection failed:", err);
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => alert('Failed to initialize. Please refresh the page and try again.')
-        });
-        return;
+        // Check if it's an editable input type
+        if (el instanceof HTMLInputElement) {
+          const validTypes = ["text", "search", "email", "url"];
+          if (!validTypes.includes(el.type)) {
+            return { success: false, error: "Not an editable input type" };
+          }
+        }
+        
+        // Generate selector
+        let selector = "";
+        if (el.id) {
+          selector = `#${el.id}`;
+        } else if (el.name) {
+          selector = `${el.tagName.toLowerCase()}[name='${el.name}']`;
+        } else {
+          selector = el.tagName.toLowerCase();
+        }
+        
+        return {
+          success: true,
+          selector: selector,
+          url: document.location.href,
+          tagName: el.tagName
+        };
       }
-    } else {
-      console.log("[Background] Content script already loaded, using existing instance");
+    });
+
+    const response = result?.result;
+    
+    if (!response || !response.success) {
+      await showMessage(tab.id, 'Please click inside a text input field first, then right-click and select "Add as Paste Target".');
+      return;
     }
 
-    // Send message to get element info - add small delay to ensure focus is stable
-    setTimeout(() => {
-      chrome.tabs.sendMessage(tab.id, { type: "get_element_info" }, async (response) => {
-        if (chrome.runtime.lastError) {
-          console.error("[Background] Message failed:", chrome.runtime.lastError.message);
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => alert('Please click inside a text input field first, then right-click and select "Add as Paste Target".')
-          });
-          return;
-        }
-        
-        if (!response || !response.success) {
-          console.warn("[Background] Could not capture element info");
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => alert('Please click inside a text input field first.')
-          });
-          return;
-        }
+    // Prompt for name
+    const defaultName = `Paste to ${new URL(response.url).hostname}`;
+    const nameResult = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (suggested) => prompt("Name for new paste target:", suggested),
+      args: [defaultName]
+    });
 
-        // Prompt for name
-        const defaultName = `Paste to ${new URL(response.url).hostname}`;
-        chrome.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: suggestedName => prompt("Name for new paste target:", suggestedName),
-          args: [defaultName]
-        }, async (results) => {
-          if (chrome.runtime.lastError) {
-            console.error("[Background] Prompt failed:", chrome.runtime.lastError.message);
-            return;
-          }
-          
-          const name = results?.[0]?.result;
-          
-          if (!name) {
-            console.log("[Background] User cancelled");
-            return;
-          }
+    const name = nameResult?.[0]?.result;
+    if (!name) {
+      console.log("[Background] User cancelled");
+      return;
+    }
 
-          // Check duplicates
-          const isDuplicate = presets.some(p =>
-            p.selector === response.selector &&
-            new URL(p.url).hostname === new URL(response.url).hostname
-          );
+    // Check for duplicates
+    const isDuplicate = presets.some(p =>
+      p.selector === response.selector &&
+      new URL(p.url).hostname === new URL(response.url).hostname
+    );
 
-          if (isDuplicate) {
-            console.warn("[Background] Duplicate preset detected");
-            chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              func: () => alert('A preset for this element already exists on this domain.')
-            });
-            return;
-          }
+    if (isDuplicate) {
+      await showMessage(tab.id, 'A preset for this element already exists on this domain.');
+      return;
+    }
 
-          const newPreset = {
-            id: Date.now().toString(),
-            name,
-            url: response.url,
-            selector: response.selector,
-            autoSubmit: true,
-            reuseTab: false
-          };
+    // Save new preset
+    const newPreset = {
+      id: Date.now().toString(),
+      name,
+      url: response.url,
+      selector: response.selector,
+      autoSubmit: true,
+      reuseTab: false
+    };
 
-          presets.push(newPreset);
-          await savePresets();
-          console.log("[Background] New preset added:", newPreset);
-
-          chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: (n) => alert(`Preset "${n}" added successfully!`),
-            args: [name]
-          });
-        });
-      });
-    }, 50); // 50ms delay to ensure focus is stable
+    presets.push(newPreset);
+    await savePresets();
+    
+    await showMessage(tab.id, `Preset "${name}" added successfully!`);
+    console.log("[Background] ========== ADD TARGET COMPLETE ==========\n");
     return;
   }
 
   // Handle preset click
+  console.log("[Background] ========== PRESET CLICK ==========");
   const preset = presets.find(p => p.id.toString() === info.menuItemId);
+  
   if (!preset) {
-    console.warn("[Background] No matching preset");
+    console.warn("[Background] Preset not found");
     return;
   }
 
+  console.log("[Background] Using preset:", preset.name);
+
+  // Check if selection text was provided by Chrome (available at right-click time)
   if (!info.selectionText || info.selectionText.trim() === "") {
-    console.warn("[Background] Empty selection");
+    console.warn("[Background] No selection text available");
+    await showMessage(tab.id, 'Please select some text first, then right-click on the selection and choose a paste target.');
     return;
   }
 
-  const injectPaste = (tabId, attempt) => {
-    console.log(`[Background] Inject attempt ${attempt} for tab ${tabId}`);
+  const textToPaste = info.selectionText;
+  console.log("[Background] Pasting text:", textToPaste.substring(0, 50) + "...");
 
+  // Paste function
+  const injectPaste = (tabId, attempt) => {
+    console.log(`[Background] Paste attempt ${attempt}`);
+    
     chrome.scripting.executeScript({
       target: { tabId, allFrames: true },
       func: (selector, text, autoSubmit, attempt) => {
-        console.log(`[Injected] Attempt ${attempt}`);
         const el = document.querySelector(selector);
-
         if (!el) {
           console.warn(`[Injected] Element not found: ${selector}`);
           return;
@@ -422,7 +329,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
         el.focus();
         el.value = text;
         el.setAttribute("value", text);
-
         el.dispatchEvent(new Event('input', { bubbles: true }));
         el.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -441,34 +347,33 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
           if (el.form) {
             try {
               el.form.requestSubmit ? el.form.requestSubmit() : el.form.submit();
-              console.log("[Injected] Form submitted");
               return;
             } catch (err) {
-              console.warn("[Injected] Form submission failed:", err);
+              console.warn("[Injected] Form submit failed:", err);
             }
           }
 
-          const buttonCandidates = [
+          const buttons = [
             'button[type="submit"]',
             'button[aria-label*="search"]',
             'button[data-test-id*="search"]',
             'input[type="submit"]'
           ];
-          for (const sel of buttonCandidates) {
+          
+          for (const sel of buttons) {
             const btn = document.querySelector(sel);
             if (btn) {
               try {
                 btn.click();
-                console.log(`[Injected] Clicked: ${sel}`);
                 break;
               } catch (err) {
-                console.warn(`[Injected] Click failed: ${sel}`, err);
+                console.warn("[Injected] Button click failed:", err);
               }
             }
           }
         }
       },
-      args: [preset.selector, info.selectionText, preset.autoSubmit, attempt]
+      args: [preset.selector, textToPaste, preset.autoSubmit, attempt]
     });
 
     if (attempt === 1) {
@@ -477,23 +382,49 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     }
   };
 
+  // Find or create tab
   const urlOrigin = new URL(preset.url).origin;
-  const reuseTabId = preset.reuseTab ? await findReusableTab(urlOrigin, preset.selector) : null;
-
-  if (reuseTabId) {
-    injectPaste(reuseTabId, 1);
-    chrome.tabs.update(reuseTabId, { active: true });
-  } else {
-    chrome.tabs.create({ url: preset.url }, (newTab) => {
-      function listener(tabId, changeInfo) {
-        if (tabId === newTab.id && changeInfo.status === 'complete') {
-          injectPaste(tabId, 1);
-          chrome.tabs.onUpdated.removeListener(listener);
+  
+  if (preset.reuseTab) {
+    console.log("[Background] Looking for reusable tab...");
+    const tabs = await chrome.tabs.query({});
+    
+    for (let t of tabs) {
+      try {
+        const tabURL = new URL(t.url);
+        if (tabURL.origin === urlOrigin) {
+          const [result] = await chrome.scripting.executeScript({
+            target: { tabId: t.id },
+            func: sel => !!document.querySelector(sel),
+            args: [preset.selector]
+          });
+          
+          if (result.result) {
+            console.log("[Background] Reusing tab:", t.id);
+            injectPaste(t.id, 1);
+            chrome.tabs.update(t.id, { active: true });
+            return;
+          }
         }
+      } catch (e) {
+        console.warn("[Background] Error checking tab:", e);
       }
-      chrome.tabs.onUpdated.addListener(listener);
-    });
+    }
   }
+
+  // Create new tab
+  console.log("[Background] Creating new tab...");
+  chrome.tabs.create({ url: preset.url }, (newTab) => {
+    function listener(tabId, changeInfo) {
+      if (tabId === newTab.id && changeInfo.status === 'complete') {
+        injectPaste(tabId, 1);
+        chrome.tabs.onUpdated.removeListener(listener);
+      }
+    }
+    chrome.tabs.onUpdated.addListener(listener);
+  });
+
+  console.log("[Background] ========== PRESET CLICK COMPLETE ==========\n");
 });
 
-console.log("[Background] Service worker initialization complete");
+console.log("[Background] ========== SERVICE WORKER READY ==========\n");

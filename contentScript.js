@@ -1,118 +1,57 @@
-// Prevent duplicate event listener registration
+// Prevent duplicate initialization
 if (!window.__CONTENT_SCRIPT_INITIALIZED__) {
-  console.log("[ContentScript] Initializing for the first time");
+  console.log("[ContentScript] ========== INITIALIZING ==========");
   window.__CONTENT_SCRIPT_INITIALIZED__ = true;
   
-  // Store last clicked element globally so message handler can access it
-  window.lastClickedElement = null;
+  // Store the element being right-clicked for "Add as Paste Target"
+  window.rightClickedElement = null;
   
-  // Capture the element when user clicks
-  document.addEventListener('mousedown', (e) => {
-    const target = e.target;
-    if (target && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
-      window.lastClickedElement = target;
-      console.log("[ContentScript] Captured element on mousedown:", target.tagName);
-    }
+  // Capture the right-clicked element
+  document.addEventListener('contextmenu', (e) => {
+    window.rightClickedElement = e.target;
+    console.log("[ContentScript] Right-clicked element stored:", e.target.tagName);
   }, true);
   
-  // Event listeners for context status
-  function updateContextStatus() {
-    const isEditable =
-      document.activeElement &&
-      (document.activeElement.isContentEditable ||
-        document.activeElement.tagName === "TEXTAREA" ||
-        (document.activeElement.tagName === "INPUT" &&
-          (document.activeElement.type === "text" ||
-           document.activeElement.type === "search" ||
-           document.activeElement.type === "email" ||
-           document.activeElement.type === "url")));
-
-    const hasSelection = window.getSelection().toString().length > 0;
-
-    if (chrome.runtime?.id) {
-      try {
-        chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
-      } catch (err) {
-        console.warn("[ContentScript] Failed to send contextStatus:", err.message);
-      }
-    }
-  }
-
-  document.addEventListener('selectionchange', updateContextStatus);
-  document.addEventListener('focusin', updateContextStatus);
-  document.addEventListener('focusout', updateContextStatus);
-
-  // Initial status update
-  updateContextStatus();
-  
-  console.log("[ContentScript] Event listeners attached");
+  console.log("[ContentScript] Listeners attached");
 } else {
-  console.log("[ContentScript] Already initialized, skipping event listener setup");
+  console.log("[ContentScript] Already initialized");
 }
 
-// Message listener - always register (safe to register multiple times)
+// Message listener for commands from background
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("[ContentScript] Message received:", message.type);
+  
   if (message.type === "ping") {
     sendResponse({ success: true });
     return true;
   }
 
-  if (message.type === "force_refresh_status") {
-    console.log("[ContentScript] Force refresh status requested");
-    
-    // Re-calculate context status immediately
-    const isEditable =
-      document.activeElement &&
-      (document.activeElement.isContentEditable ||
-        document.activeElement.tagName === "TEXTAREA" ||
-        (document.activeElement.tagName === "INPUT" &&
-          (document.activeElement.type === "text" ||
-           document.activeElement.type === "search" ||
-           document.activeElement.type === "email" ||
-           document.activeElement.type === "url")));
-
-    const hasSelection = window.getSelection().toString().length > 0;
-
-    console.log("[ContentScript] Forced status - isEditable:", isEditable, "hasSelection:", hasSelection);
-
-    if (chrome.runtime?.id) {
-      try {
-        chrome.runtime.sendMessage({ type: "contextStatus", isEditable, hasSelection });
-        sendResponse({ success: true });
-      } catch (err) {
-        console.warn("[ContentScript] Failed to send forced contextStatus:", err.message);
-        sendResponse({ success: false, error: err.message });
-      }
-    }
-    
-    return true;
-  }
-
   if (message.type === "get_element_info") {
-    // Try to get last clicked element first, then fall back to activeElement
-    let el = null;
+    console.log("[ContentScript] Getting element info for Add Target");
     
-    if (window.lastClickedElement && document.contains(window.lastClickedElement)) {
-      el = window.lastClickedElement;
-      console.log("[ContentScript] Using last clicked element");
-    } else {
-      el = document.activeElement;
-      console.log("[ContentScript] Using active element");
-    }
+    let el = window.rightClickedElement;
     
+    // Validate it's an editable element
     if (!el || !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement)) {
-      console.warn("[ContentScript] No active input or textarea element");
-      sendResponse({ success: false, error: "No active editable element" });
+      console.warn("[ContentScript] Not a valid input/textarea");
+      sendResponse({ 
+        success: false, 
+        error: "Please right-click directly on a text input field." 
+      });
       return true;
     }
 
+    // Generate selector
     let selector = "";
-    if (el.id) selector = `#${el.id}`;
-    else if (el.name) selector = `${el.tagName.toLowerCase()}[name='${el.name}']`;
-    else selector = el.tagName.toLowerCase();
+    if (el.id) {
+      selector = `#${el.id}`;
+    } else if (el.name) {
+      selector = `${el.tagName.toLowerCase()}[name='${el.name}']`;
+    } else {
+      selector = el.tagName.toLowerCase();
+    }
 
-    console.log("[ContentScript] Element selector:", selector);
-
+    console.log("[ContentScript] Element info:", selector);
     sendResponse({
       success: true,
       selector,
@@ -122,26 +61,22 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === "SET_INPUT_VALUE") {
-    const input = document.querySelector(message.selector);
-    if (input) {
-      input.value = message.value;
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-
-      if (message.autoSubmit) {
-        const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true });
-        input.dispatchEvent(event);
-      }
-
-      sendResponse({ success: true });
-    } else {
-      sendResponse({ success: false, error: "Input not found" });
-    }
+  if (message.type === "check_selection") {
+    console.log("[ContentScript] Checking for text selection");
+    
+    const selection = window.getSelection();
+    const hasSelection = selection && selection.toString().length > 0;
+    
+    console.log("[ContentScript] Has selection:", hasSelection);
+    sendResponse({ 
+      success: true, 
+      hasSelection,
+      selectionText: hasSelection ? selection.toString() : ""
+    });
     return true;
   }
 
-  return true;
+  return false;
 });
 
-console.log("[ContentScript] Message listener registered");
+console.log("[ContentScript] Ready");
